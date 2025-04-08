@@ -1,0 +1,104 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: flaukowski_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run linting
+      run: npm run lint
+      
+    - name: Set up environment variables
+      run: |
+        echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/flaukowski_test" >> $GITHUB_ENV
+        echo "PGHOST=localhost" >> $GITHUB_ENV
+        echo "PGPORT=5432" >> $GITHUB_ENV
+        echo "PGUSER=postgres" >> $GITHUB_ENV
+        echo "PGPASSWORD=postgres" >> $GITHUB_ENV
+        echo "PGDATABASE=flaukowski_test" >> $GITHUB_ENV
+        
+    - name: Push database schema
+      run: npm run db:push
+        
+    - name: Run tests
+      run: npm test
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build production
+      run: npm run build
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts
+        path: dist/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts
+        path: dist/
+    
+    # Placeholder for actual deployment steps
+    # This would typically include steps to deploy to your hosting platform
+    # For example, deploying to Vercel, Netlify, AWS, etc.
+    - name: Deploy application
+      run: |
+        echo "Deploying application..."
+        # Add actual deployment commands here
