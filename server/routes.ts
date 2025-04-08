@@ -5,7 +5,8 @@ import {
   insertStreamSchema, 
   insertKernelSchema, 
   insertResonanceSchema,
-  insertUserSchema
+  insertUserSchema,
+  insertEchoSchema
 } from "@shared/schema";
 import OpenAI from "openai";
 import { WebSocketServer } from "ws";
@@ -111,7 +112,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const echoes = await storage.getAllEchoes();
       res.json(echoes);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+  
+  app.post('/api/echo', async (req, res) => {
+    try {
+      const echoInput = insertEchoSchema.parse(req.body);
+      const echo = await storage.createEcho(echoInput);
+      res.status(201).json(echo);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -151,7 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         max_tokens: 200,
       });
       
-      const echoContent = response.choices[0].message.content;
+      const echoContent = response.choices[0].message.content || "Connection with the other side has been temporarily lost";
       
       // Store the generated echo
       const echo = await storage.createEcho({
@@ -172,7 +183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const nodes = await storage.getSynapticWebData();
       res.json(nodes);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 

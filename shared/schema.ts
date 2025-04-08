@@ -1,6 +1,7 @@
 import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -51,11 +52,35 @@ export const echoes = pgTable("echoes", {
 export const synapticConnections = pgTable("synaptic_connections", {
   id: serial("id").primaryKey(),
   sourceId: integer("source_id").notNull(),
-  sourceType: text("source_type").notNull(), // stream, kernel, echo
+  sourceType: text("source_type").notNull(), // stream, kernel, echo, lifeform
   targetId: integer("target_id").notNull(),
-  targetType: text("target_type").notNull(), // stream, kernel, echo
+  targetType: text("target_type").notNull(), // stream, kernel, echo, lifeform
   connectionStrength: integer("connection_strength").default(1).notNull(),
   symbolicRelation: text("symbolic_relation").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const lifeforms = pgTable("lifeforms", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // cellular, chemical, digital, quantum
+  dna: text("dna").notNull(), // genetic code or rules that define this life form
+  state: jsonb("state").notNull(), // current state data of the simulation
+  generation: integer("generation").default(0).notNull(),
+  resonanceCount: integer("resonance_count").default(0).notNull(),
+  isCoreMind: boolean("is_core_mind").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+});
+
+export const lifeformEvolutions = pgTable("lifeform_evolutions", {
+  id: serial("id").primaryKey(),
+  lifeformId: integer("lifeform_id").references(() => lifeforms.id),
+  previousState: jsonb("previous_state").notNull(),
+  newState: jsonb("new_state").notNull(),
+  evolutionType: text("evolution_type").notNull(), // mutation, adaptation, emergence, expansion
+  generation: integer("generation").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -100,6 +125,22 @@ export const insertSynapticConnectionSchema = createInsertSchema(synapticConnect
   symbolicRelation: true,
 });
 
+export const insertLifeformSchema = createInsertSchema(lifeforms).pick({
+  userId: true,
+  name: true,
+  type: true,
+  dna: true,
+  state: true,
+});
+
+export const insertLifeformEvolutionSchema = createInsertSchema(lifeformEvolutions).pick({
+  lifeformId: true,
+  previousState: true,
+  newState: true,
+  evolutionType: true,
+  generation: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -118,3 +159,32 @@ export type InsertEcho = z.infer<typeof insertEchoSchema>;
 
 export type SynapticConnection = typeof synapticConnections.$inferSelect;
 export type InsertSynapticConnection = z.infer<typeof insertSynapticConnectionSchema>;
+
+export type Lifeform = typeof lifeforms.$inferSelect;
+export type InsertLifeform = z.infer<typeof insertLifeformSchema>;
+
+export type LifeformEvolution = typeof lifeformEvolutions.$inferSelect;
+export type InsertLifeformEvolution = z.infer<typeof insertLifeformEvolutionSchema>;
+
+// Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  streams: many(streams),
+  kernels: many(kernels),
+  resonances: many(resonances),
+  lifeforms: many(lifeforms),
+}));
+
+export const lifeformsRelations = relations(lifeforms, ({ one, many }) => ({
+  user: one(users, {
+    fields: [lifeforms.userId],
+    references: [users.id],
+  }),
+  evolutions: many(lifeformEvolutions),
+}));
+
+export const lifeformEvolutionsRelations = relations(lifeformEvolutions, ({ one }) => ({
+  lifeform: one(lifeforms, {
+    fields: [lifeformEvolutions.lifeformId],
+    references: [lifeforms.id],
+  }),
+}));
