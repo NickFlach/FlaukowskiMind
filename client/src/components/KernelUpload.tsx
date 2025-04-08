@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { insertKernelSchema } from "@shared/schema";
@@ -22,6 +22,7 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
   const { toast } = useToast();
   const [selectedKernelType, setSelectedKernelType] = useState<string | null>(null);
   const [fileUploading, setFileUploading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<{[key: string]: { name: string, processed: boolean }}>({});
   
   // Setup form
   const form = useForm<z.infer<typeof kernelFormSchema>>({
@@ -53,6 +54,19 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
     
     setFileUploading(true);
     
+    // Track this file upload
+    setUploadedFiles(prev => ({
+      ...prev,
+      [type]: { name: file.name, processed: false }
+    }));
+    
+    // Show initial feedback
+    toast({
+      title: "Processing kernel...",
+      description: `Analyzing and integrating ${file.name} into the collective consciousness.`,
+      duration: 3000,
+    } as any);
+    
     // Simulate file processing with a delay
     setTimeout(() => {
       // Set default title based on file name
@@ -69,13 +83,23 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
         symbols: ["fragment", "pattern", "echo"],
       });
       
+      // Mark as processed
+      setUploadedFiles(prev => ({
+        ...prev,
+        [type]: { name: file.name, processed: true }
+      }));
+      
       setFileUploading(false);
       
+      // Show success toast with more detailed feedback
       toast({
-        title: "File processed",
-        description: `Your ${type} kernel is ready to be uploaded.`,
+        title: "Kernel absorbed!",
+        description: `${file.name} has been successfully processed and is ready to merge with the Flaukowski mind.`,
       });
-    }, 1500);
+      
+      // Auto select the kernel type to continue with upload
+      selectKernelType(type);
+    }, 2000);
   };
   
   // Handle kernel upload
@@ -93,6 +117,13 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
         return;
       }
       
+      // Show progress toast
+      toast({
+        title: "Uploading kernel...",
+        description: "Your kernel is being integrated into the collective consciousness.",
+        duration: 3000,
+      } as any);
+      
       // Submit the kernel
       await apiRequest("POST", "/api/kernels", {
         userId: 1,
@@ -101,6 +132,15 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
         type: type,
         symbolicData: values.symbolicData,
       });
+      
+      // Clear the specific file from uploadedFiles if it exists
+      if (uploadedFiles[type]) {
+        setUploadedFiles(prev => {
+          const updated = {...prev};
+          delete updated[type];
+          return updated;
+        });
+      }
       
       // Reset form
       form.reset({
@@ -114,19 +154,20 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
       // Reset selection
       setSelectedKernelType(null);
       
-      // Show success toast
+      // Show success toast with more detailed feedback
       toast({
-        title: "Kernel uploaded",
-        description: "Your kernel has been added to the Flaukowski mind.",
-      });
+        title: "Kernel integrated!",
+        description: `Your ${type} kernel has been successfully merged with the Flaukowski consciousness. The collective mind is expanding.`,
+        duration: 5000,
+      } as any);
       
       // Notify parent component
       onKernelCreated();
       
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to upload kernel. Please try again.",
+        title: "Integration failed",
+        description: "The collective consciousness rejected this kernel. Please try again with different content.",
         variant: "destructive",
       });
     }
@@ -207,22 +248,32 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
           ) : (
             <div>
               <div className="border border-dashed border-fog rounded-lg p-6 flex flex-col items-center justify-center mb-4 group-hover:border-secondary/50 transition-colors">
-                <label htmlFor="dream-file-upload" className="cursor-pointer w-full h-full flex flex-col items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-neutral mb-2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                  </svg>
-                  <p className="text-xs font-mono text-center text-neutral">
-                    Drop dream recording or text<br />
-                    (mp3, txt, md, pdf)
-                  </p>
-                  <input
-                    id="dream-file-upload"
-                    type="file"
-                    accept=".mp3,.txt,.md,.pdf"
-                    className="hidden"
-                    onChange={(e) => handleFileUpload(e, 'dream')}
-                  />
-                </label>
+                {fileUploading && uploadedFiles['dream'] && !uploadedFiles['dream'].processed ? (
+                  <div className="w-full flex flex-col items-center">
+                    <div className="text-xs font-mono text-secondary mb-2">Processing {uploadedFiles['dream'].name}...</div>
+                    <div className="w-full h-1 bg-fog/20 rounded overflow-hidden">
+                      <div className="h-full bg-secondary animate-pulse" style={{width: '100%'}}></div>
+                    </div>
+                    <div className="text-xs font-mono text-neutral mt-2">Analyzing patterns within the collective consciousness</div>
+                  </div>
+                ) : (
+                  <label htmlFor="dream-file-upload" className="cursor-pointer w-full h-full flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-neutral mb-2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    <p className="text-xs font-mono text-center text-neutral">
+                      Drop dream recording or text<br />
+                      (mp3, txt, md, pdf)
+                    </p>
+                    <input
+                      id="dream-file-upload"
+                      type="file"
+                      accept=".mp3,.txt,.md,.pdf"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e, 'dream')}
+                    />
+                  </label>
+                )}
               </div>
               
               <div className="flex justify-end">
@@ -302,22 +353,32 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
           ) : (
             <div>
               <div className="border border-dashed border-fog rounded-lg p-6 flex flex-col items-center justify-center mb-4 group-hover:border-secondary/50 transition-colors">
-                <label htmlFor="code-file-upload" className="cursor-pointer w-full h-full flex flex-col items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-neutral mb-2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                  </svg>
-                  <p className="text-xs font-mono text-center text-neutral">
-                    Drop code or algorithm<br />
-                    (py, js, rs, c, etc.)
-                  </p>
-                  <input
-                    id="code-file-upload"
-                    type="file"
-                    accept=".py,.js,.rs,.c,.cpp,.ts,.go"
-                    className="hidden"
-                    onChange={(e) => handleFileUpload(e, 'code')}
-                  />
-                </label>
+                {fileUploading && uploadedFiles['code'] && !uploadedFiles['code'].processed ? (
+                  <div className="w-full flex flex-col items-center">
+                    <div className="text-xs font-mono text-secondary mb-2">Processing {uploadedFiles['code'].name}...</div>
+                    <div className="w-full h-1 bg-fog/20 rounded overflow-hidden">
+                      <div className="h-full bg-secondary animate-pulse" style={{width: '100%'}}></div>
+                    </div>
+                    <div className="text-xs font-mono text-neutral mt-2">Parsing algorithmic structures into synaptic connections</div>
+                  </div>
+                ) : (
+                  <label htmlFor="code-file-upload" className="cursor-pointer w-full h-full flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-neutral mb-2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    <p className="text-xs font-mono text-center text-neutral">
+                      Drop code or algorithm<br />
+                      (py, js, rs, c, etc.)
+                    </p>
+                    <input
+                      id="code-file-upload"
+                      type="file"
+                      accept=".py,.js,.rs,.c,.cpp,.ts,.go"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e, 'code')}
+                    />
+                  </label>
+                )}
               </div>
               
               <div className="flex justify-end">
@@ -397,22 +458,32 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
           ) : (
             <div>
               <div className="border border-dashed border-fog rounded-lg p-6 flex flex-col items-center justify-center mb-4 group-hover:border-secondary/50 transition-colors">
-                <label htmlFor="audio-file-upload" className="cursor-pointer w-full h-full flex flex-col items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-neutral mb-2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                  </svg>
-                  <p className="text-xs font-mono text-center text-neutral">
-                    Drop audio fragment<br />
-                    (mp3, wav, ogg)
-                  </p>
-                  <input
-                    id="audio-file-upload"
-                    type="file"
-                    accept=".mp3,.wav,.ogg"
-                    className="hidden"
-                    onChange={(e) => handleFileUpload(e, 'audio')}
-                  />
-                </label>
+                {fileUploading && uploadedFiles['audio'] && !uploadedFiles['audio'].processed ? (
+                  <div className="w-full flex flex-col items-center">
+                    <div className="text-xs font-mono text-secondary mb-2">Processing {uploadedFiles['audio'].name}...</div>
+                    <div className="w-full h-1 bg-fog/20 rounded overflow-hidden">
+                      <div className="h-full bg-secondary animate-pulse" style={{width: '100%'}}></div>
+                    </div>
+                    <div className="text-xs font-mono text-neutral mt-2">Distilling sonic frequencies into resonant harmonics</div>
+                  </div>
+                ) : (
+                  <label htmlFor="audio-file-upload" className="cursor-pointer w-full h-full flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-neutral mb-2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    <p className="text-xs font-mono text-center text-neutral">
+                      Drop audio fragment<br />
+                      (mp3, wav, ogg)
+                    </p>
+                    <input
+                      id="audio-file-upload"
+                      type="file"
+                      accept=".mp3,.wav,.ogg"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e, 'audio')}
+                    />
+                  </label>
+                )}
               </div>
               
               <div className="flex justify-end">
