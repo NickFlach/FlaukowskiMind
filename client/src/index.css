@@ -11,3 +11,115 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+@font-face {
+  font-family: 'Cinzel';
+  src: url('/fonts/Cinzel-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  src: url('/fonts/Cinzel-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
+/* Rainbow neon glow effects */
+.neon-glow {
+  text-shadow: 0 0 5px rgba(120, 103, 240, 0.7),
+               0 0 10px rgba(120, 103, 240, 0.5);
+  animation: neon-pulse 2s infinite alternate;
+}
+
+.rainbow-glow {
+  text-shadow: 0 0 5px rgba(255, 0, 255, 0.7),
+               0 0 10px rgba(255, 0, 255, 0.5);
+  animation: rainbow-shift 5s infinite alternate;
+}
+
+.button-glow {
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 0 5px rgba(213, 88, 200, 0.7),
+              0 0 10px rgba(213, 88, 200, 0.5);
+  animation: neon-pulse 2s infinite alternate;
+}
+
+.button-rainbow {
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 0 5px rgba(255, 0, 255, 0.7),
+              0 0 10px rgba(255, 0, 255, 0.5);
+  animation: rainbow-shift 5s infinite alternate;
+}
+
+/* Enhanced form inputs for better visibility */
+input, textarea {
+  color: white !important;
+  background-color: rgba(20, 20, 30, 0.8) !important;
+  border: 1px solid rgba(90, 90, 110, 0.6) !important;
+  box-shadow: 0 0 5px rgba(120, 103, 240, 0.3);
+  transition: all 0.3s ease;
+}
+
+input:focus, textarea:focus {
+  border-color: rgb(213, 88, 200) !important;
+  box-shadow: 0 0 8px rgba(213, 88, 200, 0.6) !important;
+  outline: none !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: rgba(180, 180, 195, 0.6) !important;
+}
+
+@keyframes neon-pulse {
+  0% {
+    text-shadow: 0 0 5px rgba(120, 103, 240, 0.7),
+                 0 0 10px rgba(120, 103, 240, 0.5);
+    box-shadow: 0 0 5px rgba(120, 103, 240, 0.7),
+                0 0 10px rgba(120, 103, 240, 0.5);
+  }
+  100% {
+    text-shadow: 0 0 10px rgba(213, 88, 200, 0.8),
+                 0 0 20px rgba(213, 88, 200, 0.6),
+                 0 0 30px rgba(213, 88, 200, 0.4);
+    box-shadow: 0 0 10px rgba(213, 88, 200, 0.8),
+                0 0 20px rgba(213, 88, 200, 0.6),
+                0 0 30px rgba(213, 88, 200, 0.4);
+  }
+}
+
+@keyframes rainbow-shift {
+  0% {
+    text-shadow: 0 0 5px rgba(255, 0, 0, 0.7),
+                 0 0 10px rgba(255, 0, 0, 0.5);
+    box-shadow: 0 0 5px rgba(255, 0, 0, 0.7),
+                0 0 10px rgba(255, 0, 0, 0.5);
+  }
+  25% {
+    text-shadow: 0 0 5px rgba(255, 165, 0, 0.7),
+                 0 0 10px rgba(255, 165, 0, 0.5);
+    box-shadow: 0 0 5px rgba(255, 165, 0, 0.7),
+                0 0 10px rgba(255, 165, 0, 0.5);
+  }
+  50% {
+    text-shadow: 0 0 5px rgba(0, 255, 0, 0.7),
+                 0 0 10px rgba(0, 255, 0, 0.5);
+    box-shadow: 0 0 5px rgba(0, 255, 0, 0.7),
+                0 0 10px rgba(0, 255, 0, 0.5);
+  }
+  75% {
+    text-shadow: 0 0 5px rgba(0, 0, 255, 0.7),
+                 0 0 10px rgba(0, 0, 255, 0.5);
+    box-shadow: 0 0 5px rgba(0, 0, 255, 0.7),
+                0 0 10px rgba(0, 0, 255, 0.5);
+  }
+  100% {
+    text-shadow: 0 0 5px rgba(255, 0, 255, 0.7),
+                 0 0 10px rgba(255, 0, 255, 0.5);
+    box-shadow: 0 0 5px rgba(255, 0, 255, 0.7),
+                0 0 10px rgba(255, 0, 255, 0.5);
+  }
+}

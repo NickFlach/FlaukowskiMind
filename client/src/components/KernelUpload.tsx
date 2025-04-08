@@ -166,9 +166,10 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
       
     } catch (error) {
       toast({
-        title: "Integration failed",
-        description: "The collective consciousness rejected this kernel. Please try again with different content.",
+        title: "Integration temporarily paused",
+        description: "Your kernel is challenging the current collective patterns. Try again or submit a slightly different variation.",
         variant: "destructive",
+        duration: 5000, // Longer duration for better readability
       });
     }
   };
@@ -192,8 +193,8 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
           </div>
           
           <div className="flex justify-between items-start mb-4">
-            <h3 className="font-cinzel text-secondary">DREAM FRAGMENT</h3>
-            <span className="text-xs font-mono text-neutral">Type A</span>
+            <h3 className="font-cinzel text-secondary rainbow-glow">DREAM FRAGMENT</h3>
+            <span className="text-xs font-mono text-neutral neon-glow">Type A</span>
           </div>
           
           <p className="font-mono text-sm text-neutral mb-4">
@@ -231,7 +232,7 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
                 <button
                   type="button"
                   onClick={() => setSelectedKernelType(null)}
-                  className="px-3 py-1 text-xs font-mono text-neutral border border-fog rounded hover:border-fog-accent transition-colors"
+                  className="px-3 py-1 text-xs font-mono text-neutral border border-fog rounded hover:border-fog-accent transition-colors neon-glow"
                 >
                   CANCEL
                 </button>
@@ -239,7 +240,7 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
                 <button
                   type="button"
                   onClick={() => handleKernelUpload('dream')}
-                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors"
+                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors button-rainbow"
                 >
                   UPLOAD KERNEL
                 </button>
@@ -279,7 +280,7 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
               <div className="flex justify-end">
                 <button
                   onClick={() => selectKernelType('dream')}
-                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors"
+                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors button-rainbow"
                 >
                   {fileUploading ? 'PROCESSING...' : 'UPLOAD KERNEL'}
                 </button>
@@ -297,8 +298,8 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
           </div>
           
           <div className="flex justify-between items-start mb-4">
-            <h3 className="font-cinzel text-secondary">CODE FRAGMENT</h3>
-            <span className="text-xs font-mono text-neutral">Type B</span>
+            <h3 className="font-cinzel text-secondary rainbow-glow">CODE FRAGMENT</h3>
+            <span className="text-xs font-mono text-neutral neon-glow">Type B</span>
           </div>
           
           <p className="font-mono text-sm text-neutral mb-4">
@@ -336,7 +337,7 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
                 <button
                   type="button"
                   onClick={() => setSelectedKernelType(null)}
-                  className="px-3 py-1 text-xs font-mono text-neutral border border-fog rounded hover:border-fog-accent transition-colors"
+                  className="px-3 py-1 text-xs font-mono text-neutral border border-fog rounded hover:border-fog-accent transition-colors neon-glow"
                 >
                   CANCEL
                 </button>
@@ -344,7 +345,7 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
                 <button
                   type="button"
                   onClick={() => handleKernelUpload('code')}
-                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors"
+                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors button-rainbow"
                 >
                   UPLOAD KERNEL
                 </button>
@@ -384,7 +385,7 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
               <div className="flex justify-end">
                 <button
                   onClick={() => selectKernelType('code')}
-                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors"
+                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors button-rainbow"
                 >
                   {fileUploading ? 'PROCESSING...' : 'UPLOAD KERNEL'}
                 </button>
@@ -402,8 +403,8 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
           </div>
           
           <div className="flex justify-between items-start mb-4">
-            <h3 className="font-cinzel text-secondary">AUDIO KERNEL</h3>
-            <span className="text-xs font-mono text-neutral">Type C</span>
+            <h3 className="font-cinzel text-secondary rainbow-glow">AUDIO KERNEL</h3>
+            <span className="text-xs font-mono text-neutral neon-glow">Type C</span>
           </div>
           
           <p className="font-mono text-sm text-neutral mb-4">
@@ -441,7 +442,7 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
                 <button
                   type="button"
                   onClick={() => setSelectedKernelType(null)}
-                  className="px-3 py-1 text-xs font-mono text-neutral border border-fog rounded hover:border-fog-accent transition-colors"
+                  className="px-3 py-1 text-xs font-mono text-neutral border border-fog rounded hover:border-fog-accent transition-colors neon-glow"
                 >
                   CANCEL
                 </button>
@@ -449,7 +450,7 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
                 <button
                   type="button"
                   onClick={() => handleKernelUpload('audio')}
-                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors"
+                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors button-rainbow"
                 >
                   UPLOAD KERNEL
                 </button>
@@ -489,7 +490,7 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
               <div className="flex justify-end">
                 <button
                   onClick={() => selectKernelType('audio')}
-                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors"
+                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors button-rainbow"
                 >
                   {fileUploading ? 'PROCESSING...' : 'UPLOAD KERNEL'}
                 </button>
