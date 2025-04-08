@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import MobileMenu from "@/components/MobileMenu";
-import Manifesto from "@/components/Manifesto";
+import FaceAnimation from "@/components/FaceAnimation";
 import StreamInterface from "@/components/StreamInterface";
 import SynapticWeb from "@/components/SynapticWeb";
 import KernelUpload from "@/components/KernelUpload";
@@ -55,7 +55,7 @@ export default function Home() {
       />
       
       <main className="pt-20 pb-24">
-        <Manifesto />
+        <FaceAnimation />
         
         <StreamInterface 
           streams={streams} 
