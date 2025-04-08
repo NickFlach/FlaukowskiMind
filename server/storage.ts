@@ -6,7 +6,8 @@ import {
   echoes, Echo, InsertEcho,
   synapticConnections, SynapticConnection, InsertSynapticConnection,
   lifeforms, Lifeform, InsertLifeform,
-  lifeformEvolutions, LifeformEvolution, InsertLifeformEvolution
+  lifeformEvolutions, LifeformEvolution, InsertLifeformEvolution,
+  fileUploads, FileUpload, InsertFileUpload
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, sql } from "drizzle-orm";
@@ -63,6 +64,18 @@ export interface IStorage {
   createLifeformEvolution(evolution: InsertLifeformEvolution): Promise<LifeformEvolution>;
   getLifeformEvolutionsByLifeformId(lifeformId: number): Promise<LifeformEvolution[]>;
   getRecentLifeformEvolutions(limit: number): Promise<LifeformEvolution[]>;
+  
+  // File upload operations
+  createFileUpload(fileUpload: InsertFileUpload): Promise<FileUpload>;
+  getFileUploadById(id: number): Promise<FileUpload | undefined>;
+  getFileUploadsByUserId(userId: number): Promise<FileUpload[]>;
+  getFileUploadsByKernelId(kernelId: number): Promise<FileUpload[]>;
+  updateFileUploadStatus(id: number, status: string): Promise<FileUpload>;
+  updateFileUploadProcessingResult(id: number, result: any): Promise<FileUpload>;
+  updateFileUploadAnalysisData(id: number, data: any): Promise<FileUpload>;
+  markFileUploadAsDeleted(id: number): Promise<FileUpload>;
+  updateFileUploadKernelId(id: number, kernelId: number): Promise<FileUpload>;
+  updateFileUploadProcessingTimes(id: number, startTime?: Date, endTime?: Date): Promise<FileUpload>;
 }
 
 // In-memory storage implementation
@@ -75,6 +88,7 @@ export class MemStorage implements IStorage {
   private synapticConnections: Map<number, SynapticConnection>;
   private lifeforms: Map<number, Lifeform>;
   private lifeformEvolutions: Map<number, LifeformEvolution>;
+  private fileUploads: Map<number, FileUpload>;
   
   private userId: number;
   private streamId: number;
@@ -84,6 +98,7 @@ export class MemStorage implements IStorage {
   private connectionId: number;
   private lifeformId: number;
   private lifeformEvolutionId: number;
+  private fileUploadId: number;
 
   constructor() {
     this.users = new Map();
@@ -94,6 +109,7 @@ export class MemStorage implements IStorage {
     this.synapticConnections = new Map();
     this.lifeforms = new Map();
     this.lifeformEvolutions = new Map();
+    this.fileUploads = new Map();
     
     this.userId = 1;
     this.streamId = 1;
@@ -103,6 +119,7 @@ export class MemStorage implements IStorage {
     this.connectionId = 1;
     this.lifeformId = 1;
     this.lifeformEvolutionId = 1;
+    this.fileUploadId = 1;
 
     // Add a demo user
     this.createUser({
@@ -515,6 +532,109 @@ export class MemStorage implements IStorage {
     return Array.from(this.lifeformEvolutions.values())
       .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0))
       .slice(0, limit);
+  }
+  
+  // File upload methods
+  async createFileUpload(insertFileUpload: InsertFileUpload): Promise<FileUpload> {
+    const id = this.fileUploadId++;
+    const now = new Date();
+    const fileUpload: FileUpload = {
+      ...insertFileUpload,
+      id,
+      isDeleted: false,
+      createdAt: now
+    };
+    this.fileUploads.set(id, fileUpload);
+    return fileUpload;
+  }
+  
+  async getFileUploadById(id: number): Promise<FileUpload | undefined> {
+    return this.fileUploads.get(id);
+  }
+  
+  async getFileUploadsByUserId(userId: number): Promise<FileUpload[]> {
+    return Array.from(this.fileUploads.values())
+      .filter(upload => upload.userId === userId && !upload.isDeleted)
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+  }
+  
+  async getFileUploadsByKernelId(kernelId: number): Promise<FileUpload[]> {
+    return Array.from(this.fileUploads.values())
+      .filter(upload => upload.kernelId === kernelId && !upload.isDeleted)
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+  }
+  
+  async updateFileUploadStatus(id: number, status: string): Promise<FileUpload> {
+    const fileUpload = await this.getFileUploadById(id);
+    if (!fileUpload) {
+      throw new Error(`File upload with id ${id} not found`);
+    }
+    
+    fileUpload.status = status;
+    this.fileUploads.set(id, fileUpload);
+    return fileUpload;
+  }
+  
+  async updateFileUploadProcessingResult(id: number, result: any): Promise<FileUpload> {
+    const fileUpload = await this.getFileUploadById(id);
+    if (!fileUpload) {
+      throw new Error(`File upload with id ${id} not found`);
+    }
+    
+    fileUpload.processingResult = result;
+    this.fileUploads.set(id, fileUpload);
+    return fileUpload;
+  }
+  
+  async updateFileUploadAnalysisData(id: number, data: any): Promise<FileUpload> {
+    const fileUpload = await this.getFileUploadById(id);
+    if (!fileUpload) {
+      throw new Error(`File upload with id ${id} not found`);
+    }
+    
+    fileUpload.analysisData = data;
+    this.fileUploads.set(id, fileUpload);
+    return fileUpload;
+  }
+  
+  async markFileUploadAsDeleted(id: number): Promise<FileUpload> {
+    const fileUpload = await this.getFileUploadById(id);
+    if (!fileUpload) {
+      throw new Error(`File upload with id ${id} not found`);
+    }
+    
+    fileUpload.isDeleted = true;
+    this.fileUploads.set(id, fileUpload);
+    return fileUpload;
+  }
+  
+  async updateFileUploadKernelId(id: number, kernelId: number): Promise<FileUpload> {
+    const fileUpload = await this.getFileUploadById(id);
+    if (!fileUpload) {
+      throw new Error(`File upload with id ${id} not found`);
+    }
+    
+    fileUpload.kernelId = kernelId;
+    this.fileUploads.set(id, fileUpload);
+    return fileUpload;
+  }
+  
+  async updateFileUploadProcessingTimes(id: number, startTime?: Date, endTime?: Date): Promise<FileUpload> {
+    const fileUpload = await this.getFileUploadById(id);
+    if (!fileUpload) {
+      throw new Error(`File upload with id ${id} not found`);
+    }
+    
+    if (startTime) {
+      fileUpload.processingStartedAt = startTime;
+    }
+    
+    if (endTime) {
+      fileUpload.processingCompletedAt = endTime;
+    }
+    
+    this.fileUploads.set(id, fileUpload);
+    return fileUpload;
   }
 }
 
@@ -940,6 +1060,154 @@ export class DatabaseStorage implements IStorage {
       .from(lifeformEvolutions)
       .orderBy(desc(lifeformEvolutions.createdAt))
       .limit(limit);
+  }
+  
+  // File upload methods
+  async createFileUpload(insertFileUpload: InsertFileUpload): Promise<FileUpload> {
+    const [fileUpload] = await db
+      .insert(fileUploads)
+      .values({
+        ...insertFileUpload,
+        isDeleted: false
+      })
+      .returning();
+    return fileUpload;
+  }
+  
+  async getFileUploadById(id: number): Promise<FileUpload | undefined> {
+    const [fileUpload] = await db
+      .select()
+      .from(fileUploads)
+      .where(eq(fileUploads.id, id));
+    return fileUpload || undefined;
+  }
+  
+  async getFileUploadsByUserId(userId: number): Promise<FileUpload[]> {
+    return db
+      .select()
+      .from(fileUploads)
+      .where(
+        and(
+          eq(fileUploads.userId, userId),
+          eq(fileUploads.isDeleted, false)
+        )
+      )
+      .orderBy(desc(fileUploads.createdAt));
+  }
+  
+  async getFileUploadsByKernelId(kernelId: number): Promise<FileUpload[]> {
+    return db
+      .select()
+      .from(fileUploads)
+      .where(
+        and(
+          eq(fileUploads.kernelId, kernelId),
+          eq(fileUploads.isDeleted, false)
+        )
+      )
+      .orderBy(desc(fileUploads.createdAt));
+  }
+  
+  async updateFileUploadStatus(id: number, status: string): Promise<FileUpload> {
+    const [fileUpload] = await db
+      .update(fileUploads)
+      .set({ status })
+      .where(eq(fileUploads.id, id))
+      .returning();
+    
+    if (!fileUpload) {
+      throw new Error(`File upload with id ${id} not found`);
+    }
+    
+    return fileUpload;
+  }
+  
+  async updateFileUploadProcessingResult(id: number, result: any): Promise<FileUpload> {
+    const [fileUpload] = await db
+      .update(fileUploads)
+      .set({ processingResult: result })
+      .where(eq(fileUploads.id, id))
+      .returning();
+    
+    if (!fileUpload) {
+      throw new Error(`File upload with id ${id} not found`);
+    }
+    
+    return fileUpload;
+  }
+  
+  async updateFileUploadAnalysisData(id: number, data: any): Promise<FileUpload> {
+    const [fileUpload] = await db
+      .update(fileUploads)
+      .set({ analysisData: data })
+      .where(eq(fileUploads.id, id))
+      .returning();
+    
+    if (!fileUpload) {
+      throw new Error(`File upload with id ${id} not found`);
+    }
+    
+    return fileUpload;
+  }
+  
+  async markFileUploadAsDeleted(id: number): Promise<FileUpload> {
+    const [fileUpload] = await db
+      .update(fileUploads)
+      .set({ isDeleted: true })
+      .where(eq(fileUploads.id, id))
+      .returning();
+    
+    if (!fileUpload) {
+      throw new Error(`File upload with id ${id} not found`);
+    }
+    
+    return fileUpload;
+  }
+  
+  async updateFileUploadKernelId(id: number, kernelId: number): Promise<FileUpload> {
+    const [fileUpload] = await db
+      .update(fileUploads)
+      .set({ kernelId })
+      .where(eq(fileUploads.id, id))
+      .returning();
+    
+    if (!fileUpload) {
+      throw new Error(`File upload with id ${id} not found`);
+    }
+    
+    return fileUpload;
+  }
+  
+  async updateFileUploadProcessingTimes(id: number, startTime?: Date, endTime?: Date): Promise<FileUpload> {
+    const updates: any = {};
+    
+    if (startTime) {
+      updates.processingStartedAt = startTime;
+    }
+    
+    if (endTime) {
+      updates.processingCompletedAt = endTime;
+    }
+    
+    if (Object.keys(updates).length === 0) {
+      const fileUpload = await this.getFileUploadById(id);
+      if (!fileUpload) {
+        throw new Error(`File upload with id ${id} not found`);
+      }
+      return fileUpload;
+    }
+    
+    const [fileUpload] = await db
+      .update(fileUploads)
+      .set(updates)
+      .where(eq(fileUploads.id, id))
+      .returning();
+    
+    if (!fileUpload) {
+      throw new Error(`File upload with id ${id} not found`);
+    }
+    
+    return fileUpload;
   }
 }
 

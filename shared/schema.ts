@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, varchar, bigint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -84,6 +84,24 @@ export const lifeformEvolutions = pgTable("lifeform_evolutions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const fileUploads = pgTable("file_uploads", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  fileName: text("file_name").notNull(),
+  originalName: text("original_name").notNull(),
+  fileSize: bigint("file_size", { mode: "number" }).notNull(),
+  fileType: text("file_type").notNull(), // MIME type
+  filePath: text("file_path").notNull(),
+  status: text("status").notNull().default("processing"), // processing, processed, error
+  processingResult: jsonb("processing_result"),
+  analysisData: jsonb("analysis_data"),
+  kernelId: integer("kernel_id").references(() => kernels.id),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  processingStartedAt: timestamp("processing_started_at"),
+  processingCompletedAt: timestamp("processing_completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -141,6 +159,16 @@ export const insertLifeformEvolutionSchema = createInsertSchema(lifeformEvolutio
   generation: true,
 });
 
+export const insertFileUploadSchema = createInsertSchema(fileUploads).pick({
+  userId: true,
+  fileName: true,
+  originalName: true,
+  fileSize: true,
+  fileType: true,
+  filePath: true,
+  status: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -166,12 +194,16 @@ export type InsertLifeform = z.infer<typeof insertLifeformSchema>;
 export type LifeformEvolution = typeof lifeformEvolutions.$inferSelect;
 export type InsertLifeformEvolution = z.infer<typeof insertLifeformEvolutionSchema>;
 
+export type FileUpload = typeof fileUploads.$inferSelect;
+export type InsertFileUpload = z.infer<typeof insertFileUploadSchema>;
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   streams: many(streams),
   kernels: many(kernels),
   resonances: many(resonances),
   lifeforms: many(lifeforms),
+  fileUploads: many(fileUploads),
 }));
 
 export const lifeformsRelations = relations(lifeforms, ({ one, many }) => ({
@@ -187,4 +219,23 @@ export const lifeformEvolutionsRelations = relations(lifeformEvolutions, ({ one 
     fields: [lifeformEvolutions.lifeformId],
     references: [lifeforms.id],
   }),
+}));
+
+export const fileUploadsRelations = relations(fileUploads, ({ one }) => ({
+  user: one(users, {
+    fields: [fileUploads.userId],
+    references: [users.id],
+  }),
+  kernel: one(kernels, {
+    fields: [fileUploads.kernelId],
+    references: [kernels.id],
+  }),
+}));
+
+export const kernelsRelations = relations(kernels, ({ one, many }) => ({
+  user: one(users, {
+    fields: [kernels.userId],
+    references: [users.id],
+  }),
+  fileUploads: many(fileUploads),
 }));
