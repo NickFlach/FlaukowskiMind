@@ -1,165 +1,100 @@
-/**
- * Client-side utility functions for interacting with OpenAI via the backend
- */
-
 import { apiRequest } from './queryClient';
 
-/**
- * Request the generation of an echo from the backend
- */
-export async function requestEchoGeneration() {
-  try {
-    const response = await apiRequest('/api/echoes/generate', 'POST');
-    return response;
-  } catch (error) {
-    console.error('Error requesting echo generation:', error);
-    throw error;
-  }
-}
-
-/**
- * Submit content for symbolic analysis
- */
-export async function analyzeContent(content: string, type: string) {
-  try {
-    const response = await apiRequest('/api/symbolic/analyze', 'POST', { content, type });
-    return response;
-  } catch (error) {
-    console.error('Error analyzing content:', error);
-    throw error;
-  }
-}
-
-/**
- * Get a user's resonance analysis
- */
-export async function getUserResonancePatterns(userId: number) {
-  try {
-    const response = await apiRequest(`/api/users/${userId}/resonance-patterns`, 'GET');
-    return response;
-  } catch (error) {
-    console.error('Error getting user resonance patterns:', error);
-    throw error;
-  }
-}
-
-/**
- * Generate a user sigil
- */
-export async function generateUserSigil(userId: number) {
-  try {
-    const response = await apiRequest(`/api/users/${userId}/sigil`, 'POST');
-    return response;
-  } catch (error) {
-    console.error('Error generating user sigil:', error);
-    throw error;
-  }
-}
-
-/**
- * Get synaptic web visualization data
- */
+// Function to get synaptic web data for visualization
 export async function getSynapticWebData() {
-  try {
-    const response = await apiRequest('/api/synaptic-web', 'GET');
-    return response;
-  } catch (error) {
-    console.error('Error getting synaptic web data:', error);
-    throw error;
-  }
+  const response = await apiRequest('/api/synaptic-web');
+  return response;
 }
 
-/**
- * Create a new lifeform in the emergence lab
- */
-export async function createLifeform(lifeformData: {
-  name: string;
-  type: string;
-  initialState: any;
-}) {
-  try {
-    const response = await apiRequest('/api/lifeforms', 'POST', lifeformData);
-    return response;
-  } catch (error) {
-    console.error('Error creating lifeform:', error);
-    throw error;
-  }
+// Function to generate an echo
+export async function requestEchoGeneration() {
+  const response = await apiRequest('/api/echoes/generate', {
+    method: 'POST',
+  });
+  return response;
 }
 
-/**
- * Get all lifeforms
- */
+// Function to create a new lifeform
+export async function createLifeform(lifeformData: any) {
+  const response = await apiRequest('/api/lifeforms', {
+    method: 'POST',
+    body: JSON.stringify(lifeformData),
+  });
+  return response;
+}
+
+// Function to get all lifeforms
 export async function getAllLifeforms() {
-  try {
-    const response = await apiRequest('/api/lifeforms', 'GET');
-    return response;
-  } catch (error) {
-    console.error('Error getting lifeforms:', error);
-    throw error;
-  }
+  const response = await apiRequest('/api/lifeforms');
+  return response;
 }
 
-/**
- * Get a specific lifeform by ID
- */
+// Function to get a specific lifeform by ID
 export async function getLifeformById(id: number) {
-  try {
-    const response = await apiRequest(`/api/lifeforms/${id}`, 'GET');
-    return response;
-  } catch (error) {
-    console.error('Error getting lifeform:', error);
-    throw error;
-  }
+  const response = await apiRequest(`/api/lifeforms/${id}`);
+  return response;
 }
 
-/**
- * Get lifeforms by type
- */
-export async function getLifeformsByType(type: string) {
-  try {
-    const response = await apiRequest(`/api/lifeforms/type/${type}`, 'GET');
-    return response;
-  } catch (error) {
-    console.error('Error getting lifeforms by type:', error);
-    throw error;
-  }
+// Function to evolve a lifeform
+export async function evolveLifeform(id: number, environmentData: any) {
+  const response = await apiRequest(`/api/lifeforms/${id}/evolve`, {
+    method: 'POST',
+    body: JSON.stringify(environmentData),
+  });
+  return response;
 }
 
-/**
- * Trigger a lifeform adaptation/evolution
- */
-export async function evolveLifeform(lifeformId: number, environmentData: any) {
-  try {
-    const response = await apiRequest(`/api/lifeforms/${lifeformId}/evolve`, 'POST', { environmentData });
-    return response;
-  } catch (error) {
-    console.error('Error evolving lifeform:', error);
-    throw error;
-  }
+// Function to create a new stream
+export async function createStream(streamData: any) {
+  const response = await apiRequest('/api/streams', {
+    method: 'POST',
+    body: JSON.stringify(streamData),
+  });
+  return response;
 }
 
-/**
- * Get recent evolution records for a lifeform
- */
-export async function getLifeformEvolutions(lifeformId: number) {
-  try {
-    const response = await apiRequest(`/api/lifeforms/${lifeformId}/evolutions`, 'GET');
-    return response;
-  } catch (error) {
-    console.error('Error getting lifeform evolutions:', error);
-    throw error;
-  }
+// Function to get all streams
+export async function getAllStreams() {
+  const response = await apiRequest('/api/streams');
+  return response;
 }
 
-/**
- * Get top resonant lifeforms
- */
-export async function getTopResonantLifeforms(limit = 5) {
-  try {
-    const response = await apiRequest(`/api/lifeforms/top-resonant?limit=${limit}`, 'GET');
-    return response;
-  } catch (error) {
-    console.error('Error getting top resonant lifeforms:', error);
-    throw error;
-  }
+// Function to create a new resonance
+export async function createResonance(resonanceData: any) {
+  const response = await apiRequest('/api/resonances', {
+    method: 'POST',
+    body: JSON.stringify(resonanceData),
+  });
+  return response;
+}
+
+// Function to create a new kernel
+export async function createKernel(kernelData: any) {
+  const response = await apiRequest('/api/kernels', {
+    method: 'POST',
+    body: JSON.stringify(kernelData),
+  });
+  return response;
+}
+
+// Function to get all kernels
+export async function getAllKernels() {
+  const response = await apiRequest('/api/kernels');
+  return response;
+}
+
+// Function to generate a user sigil
+export async function generateUserSigil(userId: number) {
+  const response = await apiRequest(`/api/users/${userId}/sigil`, {
+    method: 'POST',
+  });
+  return response;
+}
+
+// Function to analyze all resonance patterns
+export async function analyzeResonancePatterns() {
+  const response = await apiRequest('/api/resonances/analyze', {
+    method: 'POST',
+  });
+  return response;
 }
