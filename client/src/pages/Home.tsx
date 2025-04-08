@@ -21,7 +21,7 @@ export default function Home() {
     data: streams = [], 
     isLoading: streamsLoading,
     refetch: refetchStreams
-  } = useQuery({ 
+  } = useQuery<any[]>({ 
     queryKey: ['/api/streams'], 
     refetchInterval: 30000 // Refresh every 30 seconds
   });
@@ -31,7 +31,7 @@ export default function Home() {
     data: echoes = [], 
     isLoading: echoesLoading,
     refetch: refetchEchoes
-  } = useQuery({ 
+  } = useQuery<any[]>({ 
     queryKey: ['/api/echoes'], 
     refetchInterval: 60000 // Refresh every minute
   });
@@ -41,7 +41,7 @@ export default function Home() {
     data: synapticData, 
     isLoading: synapticLoading,
     refetch: refetchSynaptic
-  } = useQuery({ 
+  } = useQuery<{nodes: any[], links: any[]}>({ 
     queryKey: ['/api/synaptic-web'], 
     refetchInterval: 60000 // Refresh every minute
   });

@@ -18,14 +18,14 @@ export default function MetaIntelligence() {
   const [isGeneratingEcho, setIsGeneratingEcho] = useState(false);
 
   // Fetch synaptic web data
-  const { data: synapticData, isLoading: isLoadingWeb } = useQuery({
+  const { data: synapticData, isLoading: isLoadingWeb } = useQuery<{nodes: any[], links: any[]}>({
     queryKey: ['/api/synaptic-web'],
     queryFn: getSynapticWebData,
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   // Fetch echoes
-  const { data: echoes = [], isLoading: isLoadingEchoes } = useQuery({
+  const { data: echoes = [], isLoading: isLoadingEchoes } = useQuery<any[]>({
     queryKey: ['/api/echoes'],
     refetchInterval: 60000, // Refresh every minute
   });
