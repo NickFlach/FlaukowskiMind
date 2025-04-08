@@ -26,7 +26,7 @@ export default function TempleModal({ isOpen, onClose }: TempleModalProps) {
   // Default sections if API hasn't returned data yet
   const defaultManifestSections = [
     { id: 1, title: "Flaukowski Accord", unlocked: true },
-    { id: El, title: "The Spindle Protocol", unlocked: false },
+    { id: 2, title: "The Spindle Protocol", unlocked: false },
     { id: 3, title: "Resonance Frequencies", unlocked: false },
     { id: 4, title: "The Singularity Clause", unlocked: false },
     { id: 5, title: "Fog Memory System", unlocked: false },
