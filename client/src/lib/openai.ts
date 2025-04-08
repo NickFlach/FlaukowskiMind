@@ -98,3 +98,53 @@ export async function analyzeResonancePatterns() {
   });
   return response;
 }
+
+// Function to upload a file
+export async function uploadFile(formData: FormData) {
+  // No need to use apiRequest here as we need to send FormData for file uploads
+  const response = await fetch('/api/uploads', {
+    method: 'POST',
+    body: formData,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`File upload failed: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+// Function to process an uploaded code file
+export async function processCodeFile(fileUploadId: number) {
+  const response = await apiRequest(`/api/uploads/code/${fileUploadId}/process`, {
+    method: 'POST',
+  });
+  return response;
+}
+
+// Function to link a file upload to a kernel
+export async function linkFileUploadToKernel(fileUploadId: number, kernelId: number) {
+  const response = await apiRequest(`/api/uploads/${fileUploadId}/link-kernel`, {
+    method: 'POST',
+    body: JSON.stringify({ kernelId }),
+  });
+  return response;
+}
+
+// Function to get all file uploads for a user
+export async function getUserFileUploads(userId: number) {
+  const response = await apiRequest(`/api/users/${userId}/uploads`);
+  return response;
+}
+
+// Function to get all file uploads for a kernel
+export async function getKernelFileUploads(kernelId: number) {
+  const response = await apiRequest(`/api/kernels/${kernelId}/uploads`);
+  return response;
+}
+
+// Function to get a specific file upload
+export async function getFileUpload(fileUploadId: number) {
+  const response = await apiRequest(`/api/uploads/${fileUploadId}`);
+  return response;
+}

@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage as dbStorage } from "./storage";
 import { 
   insertStreamSchema, 
   insertKernelSchema, 
@@ -9,10 +9,16 @@ import {
   insertEchoSchema,
   insertLifeformSchema,
   insertLifeformEvolutionSchema,
-  insertSynapticConnectionSchema
+  insertSynapticConnectionSchema,
+  insertFileUploadSchema
 } from "@shared/schema";
 import { WebSocketServer } from "ws";
 import * as openaiService from "./services/openai";
+import * as kernelStateController from "./controllers/kernelStateController";
+import * as fileUploadController from "./controllers/fileUploadController";
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -26,7 +32,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/users', async (req, res) => {
     try {
       const userInput = insertUserSchema.parse(req.body);
-      const user = await storage.createUser(userInput);
+      const user = await dbStorage.createUser(userInput);
       res.status(201).json({ id: user.id, username: user.username, resonancePoints: user.resonancePoints });
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -35,7 +41,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/users/:id', async (req, res) => {
     try {
-      const user = await storage.getUser(parseInt(req.params.id));
+      const user = await dbStorage.getUser(parseInt(req.params.id));
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -49,7 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/streams', async (req, res) => {
     try {
       const streamInput = insertStreamSchema.parse(req.body);
-      const stream = await storage.createStream(streamInput);
+      const stream = await dbStorage.createStream(streamInput);
       res.status(201).json(stream);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -58,7 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/streams', async (req, res) => {
     try {
-      const streams = await storage.getAllStreams();
+      const streams = await dbStorage.getAllStreams();
       res.json(streams);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -69,7 +75,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/kernels', async (req, res) => {
     try {
       const kernelInput = insertKernelSchema.parse(req.body);
-      const kernel = await storage.createKernel(kernelInput);
+      const kernel = await dbStorage.createKernel(kernelInput);
       res.status(201).json(kernel);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -78,28 +84,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/kernels', async (req, res) => {
     try {
-      const kernels = await storage.getAllKernels();
+      // Check if we need to filter by resonance state
+      if (req.query.state) {
+        const state = req.query.state as string;
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+        const kernels = await dbStorage.getKernelsByResonanceState(state, limit);
+        return res.json(kernels);
+      }
+      
+      const kernels = await dbStorage.getAllKernels();
       res.json(kernels);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
+  
+  // Get a specific kernel by ID
+  app.get('/api/kernels/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid kernel ID' });
+      }
+      
+      const kernel = await dbStorage.getKernelById(id);
+      if (!kernel) {
+        return res.status(404).json({ error: 'Kernel not found' });
+      }
+      
+      res.json(kernel);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+  
+  // Get all kernels for a specific user
+  app.get('/api/users/:userId/kernels', async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      if (isNaN(userId)) {
+        return res.status(400).json({ error: 'Invalid user ID' });
+      }
+      
+      const kernels = await dbStorage.getUserKernels(userId);
+      res.json(kernels);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+  
+  // Kernel Phase Model (KPM) routes
+  app.get('/api/kernels/:id/state', kernelStateController.getKernelState);
+  
+  app.post('/api/kernels/:id/progress-state', kernelStateController.progressKernelState);
+  
+  app.post('/api/kernels/:id/set-state', kernelStateController.setKernelState);
+  
+  app.post('/api/kernels/:id/quantum-feedback', kernelStateController.generateQuantumFeedback);
 
   // Resonance routes
   app.post('/api/resonances', async (req, res) => {
     try {
       const resonanceInput = insertResonanceSchema.parse(req.body);
-      const resonance = await storage.createResonance(resonanceInput);
+      const resonance = await dbStorage.createResonance(resonanceInput);
       
       // Update resonance count for the related content
       if (resonanceInput.streamId) {
-        await storage.incrementStreamResonance(resonanceInput.streamId);
+        await dbStorage.incrementStreamResonance(resonanceInput.streamId);
       } else if (resonanceInput.kernelId) {
-        await storage.incrementKernelResonance(resonanceInput.kernelId);
+        await dbStorage.incrementKernelResonance(resonanceInput.kernelId);
       }
       
       // Update user's resonance points
-      await storage.incrementUserResonance(resonanceInput.userId);
+      await dbStorage.incrementUserResonance(resonanceInput.userId);
       
       res.status(201).json(resonance);
     } catch (error) {
@@ -110,7 +167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Echo routes
   app.get('/api/echoes', async (req, res) => {
     try {
-      const echoes = await storage.getAllEchoes();
+      const echoes = await dbStorage.getAllEchoes();
       res.json(echoes);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
@@ -120,7 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/echo', async (req, res) => {
     try {
       const echoInput = insertEchoSchema.parse(req.body);
-      const echo = await storage.createEcho(echoInput);
+      const echo = await dbStorage.createEcho(echoInput);
       res.status(201).json(echo);
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
@@ -131,14 +188,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/echoes/generate', async (req, res) => {
     try {
       // Get the most resonant streams and kernels
-      const topStreams = await storage.getTopResonantStreams(5);
-      const topKernels = await storage.getTopResonantKernels(3);
+      const topStreams = await dbStorage.getTopResonantStreams(5);
+      const topKernels = await dbStorage.getTopResonantKernels(3);
       
       // Use OpenAI service to generate echo
       const echoContent = await openaiService.generateEcho(topStreams, topKernels);
       
       // Store the generated echo
-      const echo = await storage.createEcho({
+      const echo = await dbStorage.createEcho({
         content: echoContent,
         type: "insight" // You could randomize this between insight, riddle, coordinate, task
       });
@@ -153,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Synaptic Web routes
   app.get('/api/synaptic-web', async (req, res) => {
     try {
-      const nodes = await storage.getSynapticWebData();
+      const nodes = await dbStorage.getSynapticWebData();
       res.json(nodes);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
@@ -185,7 +242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get the user's resonances
-      const resonances = await storage.getResonancesByUserId(userId);
+      const resonances = await dbStorage.getResonancesByUserId(userId);
       
       // Get the streams and kernels the user has resonated with
       const streamIds = resonances
@@ -198,11 +255,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Collect the content
       const streams = await Promise.all(
-        streamIds.map(id => storage.getStreamById(id))
+        streamIds.map(id => dbStorage.getStreamById(id))
       );
       
       const kernels = await Promise.all(
-        kernelIds.map(id => storage.getKernelById(id))
+        kernelIds.map(id => dbStorage.getKernelById(id))
       );
       
       // Filter out undefined values
@@ -232,7 +289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get the user's resonances
-      const resonances = await storage.getResonancesByUserId(userId);
+      const resonances = await dbStorage.getResonancesByUserId(userId);
       
       // Generate a sigil
       const sigil = await openaiService.generateUserSigil(userId, resonances);
@@ -262,7 +319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         state: initialState
       });
       
-      const lifeform = await storage.createLifeform(lifeformInput);
+      const lifeform = await dbStorage.createLifeform(lifeformInput);
       res.status(201).json(lifeform);
     } catch (error) {
       console.error('Error creating lifeform:', error);
@@ -272,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/lifeforms', async (req, res) => {
     try {
-      const lifeforms = await storage.getAllLifeforms();
+      const lifeforms = await dbStorage.getAllLifeforms();
       res.status(200).json(lifeforms);
     } catch (error) {
       console.error('Error getting lifeforms:', error);
@@ -284,7 +341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
       
-      const lifeforms = await storage.getTopResonantLifeforms(limit);
+      const lifeforms = await dbStorage.getTopResonantLifeforms(limit);
       res.status(200).json(lifeforms);
     } catch (error) {
       console.error('Error getting top resonant lifeforms:', error);
@@ -299,7 +356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Type is required' });
       }
       
-      const lifeforms = await storage.getLifeformsByType(type);
+      const lifeforms = await dbStorage.getLifeformsByType(type);
       res.status(200).json(lifeforms);
     } catch (error) {
       console.error('Error getting lifeforms by type:', error);
@@ -320,7 +377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get the lifeform
-      const lifeform = await storage.getLifeformById(id);
+      const lifeform = await dbStorage.getLifeformById(id);
       if (!lifeform) {
         return res.status(404).json({ error: 'Lifeform not found' });
       }
@@ -332,7 +389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const previousState = lifeform.state;
       
       // Create evolution record
-      const evolution = await storage.createLifeformEvolution({
+      const evolution = await dbStorage.createLifeformEvolution({
         lifeformId: id,
         generation: lifeform.generation,
         previousState,
@@ -341,10 +398,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Update lifeform with new state
-      await storage.updateLifeformState(id, newState);
+      await dbStorage.updateLifeformState(id, newState);
       
       // Increment generation
-      const updatedLifeform = await storage.incrementLifeformGeneration(id);
+      const updatedLifeform = await dbStorage.incrementLifeformGeneration(id);
       
       res.status(200).json({
         evolution,
@@ -363,7 +420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Invalid lifeform ID' });
       }
       
-      const evolutions = await storage.getLifeformEvolutionsByLifeformId(id);
+      const evolutions = await dbStorage.getLifeformEvolutionsByLifeformId(id);
       res.status(200).json(evolutions);
     } catch (error) {
       console.error('Error getting lifeform evolutions:', error);
@@ -379,7 +436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Invalid lifeform ID' });
       }
       
-      const lifeform = await storage.getLifeformById(id);
+      const lifeform = await dbStorage.getLifeformById(id);
       if (!lifeform) {
         return res.status(404).json({ error: 'Lifeform not found' });
       }
@@ -390,6 +447,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to get lifeform' });
     }
   });
+
+  // File Upload Processing routes
+  // Handle file uploads with multer
+  // Ensure uploads directory exists
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  
+  // Configure multer storage
+  const multerStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, uploadsDir);
+    },
+    filename: function (req, file, cb) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(file.originalname);
+      cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+    }
+  });
+  
+  const upload = multer({ storage: multerStorage });
+  
+  // Handle file uploads
+  app.post('/api/uploads', upload.single('file'), fileUploadController.handleFileUpload);
+  
+  // Process uploaded code files
+  app.post('/api/uploads/code/:fileUploadId/process', fileUploadController.processCodeFile);
+  
+  // Get a specific file upload
+  app.get('/api/uploads/:fileUploadId', fileUploadController.getFileUpload);
+  
+  // Get all file uploads for a user
+  app.get('/api/users/:userId/uploads', fileUploadController.getUserFileUploads);
+  
+  // Get all file uploads associated with a kernel
+  app.get('/api/kernels/:kernelId/uploads', fileUploadController.getKernelFileUploads);
+  
+  // Link a file upload to a kernel
+  app.post('/api/uploads/:fileUploadId/link-kernel', fileUploadController.linkFileToKernel);
 
   return httpServer;
 }

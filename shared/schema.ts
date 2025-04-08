@@ -31,6 +31,11 @@ export const kernels = pgTable("kernels", {
   symbolicData: jsonb("symbolic_data").notNull(),
   resonanceCount: integer("resonance_count").default(0).notNull(),
   isCoreMind: boolean("is_core_mind").default(false).notNull(),
+  // Kernel Phase Model (KPM) states: born, fog, orbiting, core, decohered, reemergent
+  resonanceState: text("resonance_state").default("born").notNull(),
+  stateTransitions: jsonb("state_transitions").default([]).notNull(), // array of state transitions with timestamps
+  lastStateChange: timestamp("last_state_change").defaultNow().notNull(),
+  quantumFeedback: text("quantum_feedback"), // AI feedback about the kernel
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -161,12 +166,17 @@ export const insertLifeformEvolutionSchema = createInsertSchema(lifeformEvolutio
 
 export const insertFileUploadSchema = createInsertSchema(fileUploads).pick({
   userId: true,
+  kernelId: true,
   fileName: true,
   originalName: true,
   fileSize: true,
   fileType: true,
   filePath: true,
   status: true,
+  processingResult: true,
+  analysisData: true,
+  processingStartedAt: true,
+  processingCompletedAt: true,
 });
 
 // Types

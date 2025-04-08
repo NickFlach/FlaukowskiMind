@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { uploadFile, processCodeFile, linkFileUploadToKernel } from "@/lib/openai";
 import { insertKernelSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -48,7 +49,7 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
   };
   
   // Handle file upload
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: string) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: string) => {
     const file = event.target.files?.[0];
     if (!file) return;
     
@@ -67,29 +68,53 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
       duration: 3000,
     } as any);
     
-    // Simulate file processing with a delay
-    setTimeout(() => {
-      // Set default title based on file name
-      form.setValue("title", file.name.split('.')[0]);
+    try {
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', '1'); // Default user ID
+      formData.append('fileType', type);
       
-      // For now, just store the file name in content
-      form.setValue("content", `Uploaded file: ${file.name}`);
+      // Upload the file to the server using our utility function
+      const uploadData = await uploadFile(formData);
+      const fileUploadId = uploadData.id;
       
-      // Add some mock symbolic data
-      form.setValue("symbolicData", {
-        timestamp: new Date().toISOString(),
-        fileType: file.type,
-        fileSize: file.size,
-        symbols: ["fragment", "pattern", "echo"],
-      });
+      // For code files, we need to process them separately
+      if (type === 'code') {
+        // Start code analysis process using our utility function
+        const processedData = await processCodeFile(fileUploadId);
+        
+        // Populate form with processed data
+        form.setValue("title", file.name.split('.')[0]);
+        form.setValue("content", processedData.analysisData.summary || `Code file: ${file.name}`);
+        
+        // Use the analysis data as symbolic data
+        form.setValue("symbolicData", {
+          ...processedData.analysisData,
+          fileType: file.type,
+          fileSize: file.size,
+          fileUploadId: fileUploadId,
+        });
+      } else {
+        // For other types, we'll set some basic values
+        form.setValue("title", file.name.split('.')[0]);
+        form.setValue("content", `Uploaded file: ${file.name}`);
+        
+        // Add basic symbolic data
+        form.setValue("symbolicData", {
+          timestamp: new Date().toISOString(),
+          fileType: file.type,
+          fileSize: file.size,
+          fileUploadId: fileUploadId,
+          symbols: type === 'audio' ? ["sonic", "frequency", "resonance"] : ["fragment", "pattern", "echo"],
+        });
+      }
       
       // Mark as processed
       setUploadedFiles(prev => ({
         ...prev,
         [type]: { name: file.name, processed: true }
       }));
-      
-      setFileUploading(false);
       
       // Show success toast with more detailed feedback
       toast({
@@ -99,7 +124,24 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
       
       // Auto select the kernel type to continue with upload
       selectKernelType(type);
-    }, 2000);
+    } catch (error) {
+      console.error('File upload error:', error);
+      
+      // Show error toast
+      toast({
+        title: "Kernel resonance failed",
+        description: error instanceof Error ? error.message : "The collective mind encountered interference during processing.",
+        variant: "destructive",
+      });
+      
+      // Reset upload state
+      setUploadedFiles(prev => ({
+        ...prev,
+        [type]: { name: file.name, processed: false }
+      }));
+    } finally {
+      setFileUploading(false);
+    }
   };
   
   // Handle kernel upload
@@ -125,12 +167,15 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
       } as any);
       
       // Submit the kernel
-      await apiRequest("POST", "/api/kernels", {
-        userId: 1,
-        title: values.title,
-        content: values.content,
-        type: type,
-        symbolicData: values.symbolicData,
+      await apiRequest('/api/kernels', {
+        method: 'POST',
+        body: JSON.stringify({
+          userId: 1,
+          title: values.title,
+          content: values.content,
+          type: type,
+          symbolicData: values.symbolicData,
+        })
       });
       
       // Clear the specific file from uploadedFiles if it exists

@@ -33,6 +33,12 @@ export interface IStorage {
   getKernelById(id: number): Promise<Kernel | undefined>;
   incrementKernelResonance(kernelId: number): Promise<void>;
   getTopResonantKernels(limit: number): Promise<Kernel[]>;
+  
+  // Kernel state operations - new KPM functionality
+  updateKernelState(kernelId: number, newState: string, stateTransitions: any[]): Promise<Kernel>;
+  updateKernelQuantumFeedback(kernelId: number, feedback: string): Promise<Kernel>;
+  getKernelsByResonanceState(state: string, limit?: number): Promise<Kernel[]>;
+  getUserKernels(userId: number): Promise<Kernel[]>;
 
   // Resonance operations
   createResonance(resonance: InsertResonance): Promise<Resonance>;
@@ -220,6 +226,11 @@ export class MemStorage implements IStorage {
       id,
       resonanceCount: 0,
       isCoreMind: false,
+      // KPM initialization
+      resonanceState: 'born',
+      stateTransitions: [],
+      lastStateChange: now,
+      quantumFeedback: null,
       createdAt: now
     };
     this.kernels.set(id, kernel);
@@ -244,6 +255,25 @@ export class MemStorage implements IStorage {
       // If resonance count reaches threshold, mark as part of core mind
       if (kernel.resonanceCount >= 10 && !kernel.isCoreMind) {
         kernel.isCoreMind = true;
+        
+        // If it reaches core mind status and isn't already in 'core' state, 
+        // update its state to 'core'
+        if (kernel.resonanceState !== 'core') {
+          const currentState = kernel.resonanceState || 'born';
+          const transition = {
+            fromState: currentState,
+            toState: 'core',
+            timestamp: new Date().toISOString()
+          };
+          
+          const stateTransitions = Array.isArray(kernel.stateTransitions) 
+            ? [...kernel.stateTransitions, transition] 
+            : [transition];
+            
+          kernel.resonanceState = 'core';
+          kernel.stateTransitions = stateTransitions;
+          kernel.lastStateChange = new Date();
+        }
       }
       
       this.kernels.set(kernelId, kernel);
@@ -254,6 +284,46 @@ export class MemStorage implements IStorage {
     return Array.from(this.kernels.values())
       .sort((a, b) => b.resonanceCount - a.resonanceCount)
       .slice(0, limit);
+  }
+  
+  // New KPM functionality
+  async updateKernelState(kernelId: number, newState: string, stateTransitions: any[]): Promise<Kernel> {
+    const kernel = await this.getKernelById(kernelId);
+    if (!kernel) {
+      throw new Error(`Kernel with id ${kernelId} not found`);
+    }
+    
+    kernel.resonanceState = newState;
+    kernel.stateTransitions = stateTransitions;
+    kernel.lastStateChange = new Date();
+    
+    this.kernels.set(kernelId, kernel);
+    return kernel;
+  }
+  
+  async updateKernelQuantumFeedback(kernelId: number, feedback: string): Promise<Kernel> {
+    const kernel = await this.getKernelById(kernelId);
+    if (!kernel) {
+      throw new Error(`Kernel with id ${kernelId} not found`);
+    }
+    
+    kernel.quantumFeedback = feedback;
+    this.kernels.set(kernelId, kernel);
+    return kernel;
+  }
+  
+  async getKernelsByResonanceState(state: string, limit?: number): Promise<Kernel[]> {
+    const kernels = Array.from(this.kernels.values())
+      .filter(kernel => kernel.resonanceState === state)
+      .sort((a, b) => (b.lastStateChange?.getTime() || 0) - (a.lastStateChange?.getTime() || 0));
+    
+    return limit ? kernels.slice(0, limit) : kernels;
+  }
+  
+  async getUserKernels(userId: number): Promise<Kernel[]> {
+    return Array.from(this.kernels.values())
+      .filter(kernel => kernel.userId === userId)
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
   }
 
   // Resonance methods
@@ -539,8 +609,19 @@ export class MemStorage implements IStorage {
     const id = this.fileUploadId++;
     const now = new Date();
     const fileUpload: FileUpload = {
-      ...insertFileUpload,
       id,
+      userId: insertFileUpload.userId || null,
+      kernelId: insertFileUpload.kernelId || null,
+      fileName: insertFileUpload.fileName,
+      originalName: insertFileUpload.originalName,
+      fileSize: insertFileUpload.fileSize,
+      fileType: insertFileUpload.fileType,
+      filePath: insertFileUpload.filePath,
+      status: insertFileUpload.status || 'pending',
+      processingResult: insertFileUpload.processingResult || null,
+      analysisData: insertFileUpload.analysisData || null,
+      processingStartedAt: insertFileUpload.processingStartedAt || null,
+      processingCompletedAt: insertFileUpload.processingCompletedAt || null,
       isDeleted: false,
       createdAt: now
     };
@@ -716,12 +797,18 @@ export class DatabaseStorage implements IStorage {
 
   // Kernel methods
   async createKernel(insertKernel: InsertKernel): Promise<Kernel> {
+    const now = new Date();
     const [kernel] = await db
       .insert(kernels)
       .values({ 
         ...insertKernel, 
         resonanceCount: 0, 
-        isCoreMind: false 
+        isCoreMind: false,
+        // KPM initialization
+        resonanceState: 'born',
+        stateTransitions: [],
+        lastStateChange: now,
+        quantumFeedback: null
       })
       .returning();
     return kernel;
@@ -748,11 +835,95 @@ export class DatabaseStorage implements IStorage {
     const [kernel] = await db.select().from(kernels).where(eq(kernels.id, kernelId));
     
     if (kernel && kernel.resonanceCount >= 10 && !kernel.isCoreMind) {
-      await db
-        .update(kernels)
-        .set({ isCoreMind: true })
-        .where(eq(kernels.id, kernelId));
+      // If it reaches core mind status and isn't already in 'core' state,
+      // update its state to 'core'
+      const now = new Date();
+      const currentState = kernel.resonanceState || 'born';
+      
+      if (currentState !== 'core') {
+        const transition = {
+          fromState: currentState,
+          toState: 'core',
+          timestamp: now.toISOString()
+        };
+        
+        const stateTransitions = Array.isArray(kernel.stateTransitions) 
+          ? [...kernel.stateTransitions, transition] 
+          : [transition];
+          
+        await db
+          .update(kernels)
+          .set({ 
+            isCoreMind: true,
+            resonanceState: 'core',
+            stateTransitions: stateTransitions,
+            lastStateChange: now
+          })
+          .where(eq(kernels.id, kernelId));
+      } else {
+        await db
+          .update(kernels)
+          .set({ isCoreMind: true })
+          .where(eq(kernels.id, kernelId));
+      }
     }
+  }
+  
+  // Kernel state management - KPM functionality
+  async updateKernelState(kernelId: number, newState: string, stateTransitions: any[]): Promise<Kernel> {
+    const now = new Date();
+    
+    const [kernel] = await db
+      .update(kernels)
+      .set({ 
+        resonanceState: newState,
+        stateTransitions: stateTransitions,
+        lastStateChange: now
+      })
+      .where(eq(kernels.id, kernelId))
+      .returning();
+    
+    if (!kernel) {
+      throw new Error(`Kernel with id ${kernelId} not found`);
+    }
+    
+    return kernel;
+  }
+  
+  async updateKernelQuantumFeedback(kernelId: number, feedback: string): Promise<Kernel> {
+    const [kernel] = await db
+      .update(kernels)
+      .set({ quantumFeedback: feedback })
+      .where(eq(kernels.id, kernelId))
+      .returning();
+    
+    if (!kernel) {
+      throw new Error(`Kernel with id ${kernelId} not found`);
+    }
+    
+    return kernel;
+  }
+  
+  async getKernelsByResonanceState(state: string, limit?: number): Promise<Kernel[]> {
+    const query = db
+      .select()
+      .from(kernels)
+      .where(eq(kernels.resonanceState, state))
+      .orderBy(desc(kernels.lastStateChange));
+    
+    if (limit) {
+      query.limit(limit);
+    }
+    
+    return query;
+  }
+  
+  async getUserKernels(userId: number): Promise<Kernel[]> {
+    return db
+      .select()
+      .from(kernels)
+      .where(eq(kernels.userId, userId))
+      .orderBy(desc(kernels.createdAt));
   }
 
   async getTopResonantKernels(limit: number): Promise<Kernel[]> {
