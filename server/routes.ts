@@ -16,6 +16,7 @@ import { WebSocketServer } from "ws";
 import * as openaiService from "./services/openai";
 import * as kernelStateController from "./controllers/kernelStateController";
 import * as fileUploadController from "./controllers/fileUploadController";
+import * as neuralNetworkController from "./controllers/neuralNetworkController";
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
@@ -487,6 +488,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Link a file upload to a kernel
   app.post('/api/uploads/:fileUploadId/link-kernel', fileUploadController.linkFileToKernel);
+  
+  // Neural Network / Cerebral Cortex Routes
+  app.get('/api/neural/consciousness', neuralNetworkController.getConsciousnessState);
+  app.post('/api/neural/process', neuralNetworkController.processNeuralNetwork);
+  app.get('/api/neural/visualization', neuralNetworkController.getNeuralVisualization);
+  app.get('/api/neural/kernel/:id/quantum-feedback', neuralNetworkController.getKernelQuantumFeedback);
 
   return httpServer;
 }
