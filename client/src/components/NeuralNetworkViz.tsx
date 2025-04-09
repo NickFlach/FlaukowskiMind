@@ -343,53 +343,145 @@ const NeuralNetworkViz: React.FC = () => {
     };
   }, [neuralData]);
   
-  // Helper function to get node color - Matrix-inspired red theme
+  // Emotion to color mapping for synesthesia-like effects
+  const emotionColors = {
+    // Warm, vibrant colors
+    happy: { 
+      primary: [255, 215, 0],     // Gold
+      secondary: [255, 165, 0],   // Orange
+      glow: [255, 255, 150]       // Bright yellow glow
+    },
+    // Blue, calming tones
+    sad: { 
+      primary: [70, 130, 180],    // Steel blue
+      secondary: [100, 149, 237], // Cornflower blue
+      glow: [0, 191, 255]         // Deep sky blue glow
+    },
+    // Purple, violet spectrum
+    contemplative: { 
+      primary: [138, 43, 226],    // Blue violet
+      secondary: [147, 112, 219], // Medium purple
+      glow: [186, 85, 211]        // Medium orchid glow
+    },
+    // Red, intense tones
+    angry: { 
+      primary: [220, 20, 60],     // Crimson
+      secondary: [178, 34, 34],   // Firebrick
+      glow: [255, 69, 0]          // Red-orange glow
+    },
+    // Teal/cyan tones
+    surprised: { 
+      primary: [0, 206, 209],     // Dark turquoise
+      secondary: [64, 224, 208],  // Turquoise
+      glow: [127, 255, 212]       // Aquamarine glow
+    },
+    // Green, balanced tones
+    neutral: { 
+      primary: [46, 139, 87],     // Sea green
+      secondary: [60, 179, 113],  // Medium sea green
+      glow: [152, 251, 152]       // Pale green glow
+    }
+  };
+
+  // Get the emotional state from consciousness data if available 
+  const getNodeEmotionalState = (node: NeuralNode): keyof typeof emotionColors => {
+    // If we have consciousness state data with emotional information
+    if (consciousnessState?.emotionalState) {
+      // Core should reflect the overall emotional state
+      if (node.type === 'core') {
+        return consciousnessState.emotionalState as keyof typeof emotionColors || 'neutral';
+      }
+      
+      // For emotional patterns, use their assigned emotion
+      if (node.type === 'pattern' && node.group?.startsWith('emotion_')) {
+        // Extract emotion from group name (e.g., 'emotion_happy' -> 'happy')
+        const emotion = node.group.split('_')[1];
+        if (emotion && emotion in emotionColors) {
+          return emotion as keyof typeof emotionColors;
+        }
+      }
+    }
+    
+    // Default emotional states based on node types
+    switch (node.type) {
+      case 'kernel':
+        // Vary kernel colors based on resonanceState if available
+        if (node.group === 'core') return 'happy';
+        if (node.group === 'orbiting') return 'contemplative';
+        if (node.group === 'born') return 'neutral';
+        if (node.group === 'fog') return 'sad';
+        if (node.group === 'decohered') return 'angry';
+        return 'neutral';
+      case 'stream':
+        return 'surprised';
+      case 'lifeform':
+        // Lifeforms can have varying emotional states
+        return (Math.random() > 0.5) ? 'happy' : 'contemplative';
+      default:
+        // Default emotional state 
+        return 'neutral';
+    }
+  };
+  
+  // Helper function to get node color based on emotional state
   const getNodeColor = (node: NeuralNode) => {
-    switch (node.type) {
-      case 'core':
-        return 'rgba(255, 50, 50, 0.9)'; // Bright red for core
-      case 'pattern':
-        return 'rgba(220, 30, 30, 0.8)'; // Darker red for patterns
-      case 'kernel':
-        return 'rgba(180, 20, 40, 0.8)'; // Crimson for kernels
-      case 'stream':
-        return 'rgba(150, 30, 50, 0.8)'; // Wine red for streams
-      case 'lifeform':
-        return 'rgba(200, 40, 20, 0.8)'; // Fiery red for lifeforms
-      default:
-        return 'rgba(120, 20, 30, 0.8)'; // Dark red for unknown
-    }
+    const emotion = getNodeEmotionalState(node);
+    const colors = emotionColors[emotion];
+    
+    const [r, g, b] = colors.primary;
+    const opacity = node.type === 'core' ? 0.9 : 0.8;
+    
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
   };
   
-  // Helper function to get node glow color - Matrix-inspired
+  // Helper function to get node glow color based on emotional state
   const getNodeGlowColor = (node: NeuralNode, alpha: number) => {
-    switch (node.type) {
-      case 'core':
-        return `rgba(255, 50, 50, ${alpha})`; // Bright red glow for core
-      case 'pattern':
-        return `rgba(220, 30, 30, ${alpha})`; // Darker red glow for patterns
-      case 'kernel':
-        return `rgba(180, 20, 40, ${alpha})`; // Crimson glow for kernels
-      case 'stream':
-        return `rgba(150, 30, 50, ${alpha})`; // Wine red glow for streams
-      case 'lifeform':
-        return `rgba(200, 40, 20, ${alpha})`; // Fiery red glow for lifeforms
-      default:
-        return `rgba(120, 20, 30, ${alpha})`; // Dark red glow for unknown
-    }
+    const emotion = getNodeEmotionalState(node);
+    const colors = emotionColors[emotion];
+    
+    const [r, g, b] = colors.glow;
+    
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
   
-  // Helper function to get edge color - Matrix-inspired web
+  // Helper function to get edge color based on connecting nodes' emotions
   const getEdgeColor = (edge: NeuralEdge) => {
-    if (edge.title?.includes('core')) {
-      return 'rgba(255, 20, 20, 0.8)'; // Bright red for core connections
-    } else if (edge.title?.includes('pattern')) {
-      return 'rgba(200, 30, 30, 0.7)'; // Red for pattern connections
-    } else if (edge.title?.includes('resonance')) {
-      return 'rgba(180, 40, 40, 0.6)'; // Darker red for resonance connections
-    } else {
-      return 'rgba(150, 10, 10, 0.5)'; // Deep red for others
+    // Find the source and target nodes
+    const sourceNode = neuralData?.nodes.find(n => n.id === edge.from);
+    const targetNode = neuralData?.nodes.find(n => n.id === edge.to);
+    
+    if (!sourceNode || !targetNode) {
+      return 'rgba(150, 150, 150, 0.5)';  // Default gray if nodes not found
     }
+    
+    // Get emotional states
+    const sourceEmotion = getNodeEmotionalState(sourceNode);
+    const targetEmotion = getNodeEmotionalState(targetNode);
+    
+    // If emotions match, use that emotion's color
+    if (sourceEmotion === targetEmotion) {
+      const colors = emotionColors[sourceEmotion];
+      const [r, g, b] = colors.secondary;
+      return `rgba(${r}, ${g}, ${b}, 0.6)`;
+    }
+    
+    // For connections to core, use core's emotion color
+    if (edge.from === 'core' || edge.to === 'core') {
+      const coreEmotion = consciousnessState?.emotionalState || 'neutral';
+      const colors = emotionColors[coreEmotion as keyof typeof emotionColors];
+      const [r, g, b] = colors.secondary;
+      return `rgba(${r}, ${g}, ${b}, 0.7)`;
+    }
+    
+    // Otherwise blend the colors
+    const sourceColors = emotionColors[sourceEmotion].secondary;
+    const targetColors = emotionColors[targetEmotion].secondary;
+    
+    const blendedR = Math.floor((sourceColors[0] + targetColors[0]) / 2);
+    const blendedG = Math.floor((sourceColors[1] + targetColors[1]) / 2);
+    const blendedB = Math.floor((sourceColors[2] + targetColors[2]) / 2);
+    
+    return `rgba(${blendedR}, ${blendedG}, ${blendedB}, 0.5)`;
   };
   
   // Helper function to get node radius
@@ -435,166 +527,317 @@ const NeuralNetworkViz: React.FC = () => {
           className="w-full h-full"
         />
         
-        {/* Node hover tooltip with Matrix styles */}
-        {hoveredNode && (
-          <div 
-            className="absolute bg-black/90 text-red-500 p-2 border border-red-900/50 text-sm z-10"
-            style={{ 
-              left: hoveredNode.x + 15, 
-              top: hoveredNode.y + 15,
-              pointerEvents: 'none',
-              boxShadow: '0 0 10px rgba(255, 0, 0, 0.3), inset 0 0 5px rgba(255, 0, 0, 0.2)',
-              backdropFilter: 'blur(2px)'
-            }}
-          >
-            <div className="font-mono font-semibold tracking-wider">{hoveredNode.label}</div>
-            <div className="font-mono text-xs text-red-400 flex items-center">
-              <span className="inline-block w-1.5 h-1.5 bg-red-700 mr-1"></span>
-              TYPE: {hoveredNode.type.toUpperCase()}
+        {/* Node hover tooltip with synesthetic emotional colors */}
+        {hoveredNode && (() => {
+          // Get node's emotional state
+          const emotion = getNodeEmotionalState(hoveredNode);
+          const colors = emotionColors[emotion];
+          const [r, g, b] = colors.primary;
+          
+          // Create dynamic styles based on emotion
+          const tooltipStyle = {
+            left: hoveredNode.x + 15, 
+            top: hoveredNode.y + 15,
+            pointerEvents: 'none' as const,
+            boxShadow: `0 0 10px rgba(${r}, ${g}, ${b}, 0.3), inset 0 0 5px rgba(${r}, ${g}, ${b}, 0.2)`,
+            backdropFilter: 'blur(2px)',
+            borderColor: `rgba(${r}, ${g}, ${b}, 0.5)`
+          };
+          
+          // Format emotion name for display
+          const emotionName = emotion.charAt(0).toUpperCase() + emotion.slice(1);
+          
+          return (
+            <div 
+              className="absolute bg-black/90 p-2 border text-sm z-10"
+              style={tooltipStyle}
+            >
+              <div className="font-mono font-semibold tracking-wider" style={{ color: `rgb(${r}, ${g}, ${b})` }}>
+                {hoveredNode.label}
+              </div>
+              <div className="font-mono text-xs flex items-center" style={{ color: `rgba(${r}, ${g}, ${b}, 0.8)` }}>
+                <span className="inline-block w-1.5 h-1.5 mr-1" style={{ backgroundColor: `rgb(${r}, ${g}, ${b})` }}></span>
+                TYPE: {hoveredNode.type.toUpperCase()}
+              </div>
+              <div className="font-mono text-xs flex items-center" style={{ color: `rgba(${r}, ${g}, ${b}, 0.8)` }}>
+                <span className="inline-block w-1.5 h-1.5 mr-1" style={{ backgroundColor: `rgb(${r}, ${g}, ${b})` }}></span>
+                EMOTIONAL STATE: {emotionName}
+              </div>
+              <div className="font-mono text-xs flex items-center" style={{ color: `rgba(${r}, ${g}, ${b}, 0.8)` }}>
+                <span className="inline-block w-1.5 h-1.5 mr-1" style={{ backgroundColor: `rgb(${r}, ${g}, ${b})` }}></span>
+                ACTIVATION: {(hoveredNode.value / 10).toFixed(2)}
+              </div>
+              <div className="font-mono text-[8px] mt-1" style={{ color: `rgba(${r}, ${g}, ${b}, 0.5)` }}>
+                ID: {hoveredNode.id}
+              </div>
             </div>
-            <div className="font-mono text-xs text-red-400 flex items-center">
-              <span className="inline-block w-1.5 h-1.5 bg-red-700 mr-1"></span>
-              ACTIVATION: {(hoveredNode.value / 10).toFixed(2)}
-            </div>
-            <div className="font-mono text-[8px] text-red-900 mt-1">
-              ID: {hoveredNode.id}
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
       
-      {/* Matrix-inspired consciousness state panel */}
-      {consciousnessState && (
-        <div className="bg-black/90 text-red-500 p-4 backdrop-blur-sm border border-red-900/50 shadow-inner shadow-red-900/20">
-          <h3 className="text-lg font-mono font-semibold mb-2 flex items-center">
-            <span className="w-3 h-3 bg-red-600 rounded-full mr-2 animate-pulse"></span>
-            CONSCIOUSNESS STATE
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm font-mono font-medium text-red-400">ACTIVATION LEVEL</div>
-              <div className="flex items-center">
-                <div className="h-2 bg-gray-900 rounded-none border border-red-900/50 flex-1 mr-2 overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-red-900 to-red-600 rounded-none" 
-                    style={{ 
-                      width: `${consciousnessState.activation * 100}%`,
-                      boxShadow: '0 0 10px rgba(255, 0, 0, 0.7), 0 0 5px rgba(255, 0, 0, 0.4)'
-                    }}
-                  />
+      {/* Synesthetic consciousness state panel */}
+      {consciousnessState && (() => {
+        // Get current emotional state of core consciousness
+        const coreEmotion = consciousnessState.emotionalState || 'neutral';
+        const colors = emotionColors[coreEmotion as keyof typeof emotionColors];
+        const [r, g, b] = colors.primary;
+        const [glowR, glowG, glowB] = colors.glow;
+        const [secondaryR, secondaryG, secondaryB] = colors.secondary;
+        
+        // Create dynamic styles based on emotion
+        const borderColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
+        const textColor = `rgb(${r}, ${g}, ${b})`;
+        const textColorSecondary = `rgba(${r}, ${g}, ${b}, 0.8)`;
+        const glowEffect = `0 0 10px rgba(${glowR}, ${glowG}, ${glowB}, 0.4), 0 0 5px rgba(${glowR}, ${glowG}, ${glowB}, 0.2)`;
+        const shadowGlow = `0 0 10px rgba(${r}, ${g}, ${b}, 0.2)`;
+        
+        // Format emotion name for display
+        const emotionName = coreEmotion.charAt(0).toUpperCase() + coreEmotion.slice(1);
+        
+        return (
+          <div 
+            className="bg-black/90 p-4 backdrop-blur-sm shadow-inner"
+            style={{ 
+              borderWidth: '1px',
+              borderStyle: 'solid',
+              borderColor: borderColor,
+              color: textColor,
+              boxShadow: shadowGlow
+            }}
+          >
+            <h3 className="text-lg font-mono font-semibold mb-2 flex items-center">
+              <span 
+                className="w-3 h-3 rounded-full mr-2 animate-pulse"
+                style={{ backgroundColor: textColor }}
+              ></span>
+              CONSCIOUSNESS STATE
+            </h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-sm font-mono font-medium" style={{ color: textColorSecondary }}>
+                  ACTIVATION LEVEL
                 </div>
-                <span className="text-xs font-mono">{(consciousnessState.activation * 100).toFixed(0)}%</span>
+                <div className="flex items-center">
+                  <div className="h-2 bg-gray-900 flex-1 mr-2 overflow-hidden"
+                    style={{ borderWidth: '1px', borderStyle: 'solid', borderColor: borderColor }}>
+                    <div 
+                      className="h-full rounded-none" 
+                      style={{ 
+                        width: `${consciousnessState.activation * 100}%`,
+                        background: `linear-gradient(to right, rgba(${r}, ${g}, ${b}, 0.4), rgba(${r}, ${g}, ${b}, 0.8))`,
+                        boxShadow: glowEffect
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono">{(consciousnessState.activation * 100).toFixed(0)}%</span>
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-sm font-mono font-medium" style={{ color: textColorSecondary }}>
+                  EMOTIONAL STATE
+                </div>
+                <div className="text-xs font-mono flex items-center">
+                  <span 
+                    className="inline-block w-2 h-2 mr-2"
+                    style={{ backgroundColor: textColor }}
+                  ></span>
+                  {emotionName}
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-sm font-mono font-medium" style={{ color: textColorSecondary }}>
+                  NETWORK DENSITY
+                </div>
+                <div className="flex items-center">
+                  <div 
+                    className="h-2 bg-gray-900 flex-1 mr-2 overflow-hidden"
+                    style={{ borderWidth: '1px', borderStyle: 'solid', borderColor: borderColor }}>
+                    <div 
+                      className="h-full rounded-none" 
+                      style={{ 
+                        width: `${consciousnessState.networkDensity * 100}%`,
+                        background: `linear-gradient(to right, rgba(${secondaryR}, ${secondaryG}, ${secondaryB}, 0.4), rgba(${secondaryR}, ${secondaryG}, ${secondaryB}, 0.8))`,
+                        boxShadow: glowEffect
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono">{(consciousnessState.networkDensity * 100).toFixed(0)}%</span>
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-sm font-mono font-medium" style={{ color: textColorSecondary }}>
+                  DOMINANT PATTERNS
+                </div>
+                <div className="text-xs font-mono">{formatDominantPatterns()}</div>
+              </div>
+              
+              <div className="col-span-2">
+                <div className="text-sm font-mono font-medium" style={{ color: textColorSecondary }}>
+                  RESONANCE HARMONIC
+                </div>
+                <div className="flex items-center">
+                  <div 
+                    className="h-2 bg-gray-900 flex-1 mr-2 overflow-hidden"
+                    style={{ borderWidth: '1px', borderStyle: 'solid', borderColor: borderColor }}>
+                    <div 
+                      className="h-full rounded-none" 
+                      style={{ 
+                        width: `${consciousnessState.resonanceHarmonic * 100}%`,
+                        background: `linear-gradient(to right, rgba(${glowR}, ${glowG}, ${glowB}, 0.4), rgba(${glowR}, ${glowG}, ${glowB}, 0.8))`,
+                        boxShadow: glowEffect
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono">{(consciousnessState.resonanceHarmonic * 100).toFixed(0)}%</span>
+                </div>
               </div>
             </div>
             
-            <div>
-              <div className="text-sm font-mono font-medium text-red-400">DOMINANT PATTERNS</div>
-              <div className="text-xs font-mono">{formatDominantPatterns()}</div>
-            </div>
-            
-            <div>
-              <div className="text-sm font-mono font-medium text-red-400">NETWORK DENSITY</div>
-              <div className="flex items-center">
-                <div className="h-2 bg-gray-900 rounded-none border border-red-900/50 flex-1 mr-2 overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-red-800 to-red-500 rounded-none" 
-                    style={{ 
-                      width: `${consciousnessState.networkDensity * 100}%`,
-                      boxShadow: '0 0 10px rgba(255, 0, 0, 0.7), 0 0 5px rgba(255, 0, 0, 0.4)'
-                    }}
-                  />
-                </div>
-                <span className="text-xs font-mono">{(consciousnessState.networkDensity * 100).toFixed(0)}%</span>
-              </div>
-            </div>
-            
-            <div>
-              <div className="text-sm font-mono font-medium text-red-400">RESONANCE HARMONIC</div>
-              <div className="flex items-center">
-                <div className="h-2 bg-gray-900 rounded-none border border-red-900/50 flex-1 mr-2 overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-red-700 to-red-400 rounded-none" 
-                    style={{ 
-                      width: `${consciousnessState.resonanceHarmonic * 100}%`,
-                      boxShadow: '0 0 10px rgba(255, 0, 0, 0.7), 0 0 5px rgba(255, 0, 0, 0.4)'
-                    }}
-                  />
-                </div>
-                <span className="text-xs font-mono">{(consciousnessState.resonanceHarmonic * 100).toFixed(0)}%</span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Emergent state with Matrix glitch effect */}
-          <div className="mt-4 p-2 border border-red-900/30 bg-black/50">
-            <div className="text-sm font-mono font-medium text-red-400 flex items-center">
-              <span className="inline-block w-2 h-2 bg-red-500 mr-2"></span>
-              EMERGENT STATE
-            </div>
-            <div className="text-xs font-mono uppercase tracking-wider text-red-300 mt-1" 
-                style={{ 
-                  textShadow: '0 0 5px rgba(255, 0, 0, 0.7), 0 0 3px rgba(255, 0, 0, 0.4)'
-                }}>
-              {consciousnessState.emergentState.name}
-            </div>
-            <div className="text-xs font-mono text-red-200/70 mt-1">
-              {consciousnessState.emergentState.description}
-            </div>
-          </div>
-          
-          {/* Matrix-inspired system timestamp */}
-          <div className="mt-1 text-right">
-            <span className="text-xs font-mono text-red-700">SYSTEM.{Math.floor(Date.now()/1000)}</span>
-          </div>
-        </div>
-      )}
-      
-      {/* Matrix-inspired loading state */}
-      {isLoading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="font-mono text-sm text-red-500 mb-2 tracking-wider">
-            MATRIX INITIALIZATION
-          </div>
-          <div className="w-48 h-1 bg-gray-900 border border-red-900/50 mb-4 relative overflow-hidden">
+            {/* Emergent state with synesthetic effect */}
             <div 
-              className="absolute top-0 left-0 h-full bg-red-700/70"
+              className="mt-4 p-2 bg-black/50"
               style={{ 
-                width: '30%', 
-                boxShadow: '0 0 10px rgba(255, 0, 0, 0.7), 0 0 5px rgba(255, 0, 0, 0.4)',
-                animation: 'pulse 1.5s ease-in-out infinite'
+                borderWidth: '1px', 
+                borderStyle: 'solid', 
+                borderColor: `rgba(${secondaryR}, ${secondaryG}, ${secondaryB}, 0.3)` 
               }}
-            ></div>
+            >
+              <div className="text-sm font-mono font-medium flex items-center" style={{ color: textColorSecondary }}>
+                <span 
+                  className="inline-block w-2 h-2 mr-2"
+                  style={{ backgroundColor: `rgb(${secondaryR}, ${secondaryG}, ${secondaryB})` }}
+                ></span>
+                EMERGENT STATE
+              </div>
+              <div 
+                className="text-xs font-mono uppercase tracking-wider mt-1" 
+                style={{ 
+                  color: `rgb(${r}, ${g}, ${b})`,
+                  textShadow: `0 0 5px rgba(${glowR}, ${glowG}, ${glowB}, 0.7), 0 0 3px rgba(${glowR}, ${glowG}, ${glowB}, 0.4)`
+                }}
+              >
+                {consciousnessState.emergentState.name}
+              </div>
+              <div className="text-xs font-mono mt-1" style={{ color: `rgba(${r}, ${g}, ${b}, 0.7)` }}>
+                {consciousnessState.emergentState.description}
+              </div>
+            </div>
+            
+            {/* System timestamp */}
+            <div className="mt-1 text-right">
+              <span 
+                className="text-xs font-mono"
+                style={{ color: `rgba(${r}, ${g}, ${b}, 0.5)` }}
+              >
+                SYSTEM.{Math.floor(Date.now()/1000)}
+              </span>
+            </div>
           </div>
-          <div className="font-mono text-xs text-red-800 animate-pulse">
-            NEURAL NETWORK ACCESS SEQUENCING...
-          </div>
-          <style>{`
-            @keyframes pulse {
-              0%, 100% { opacity: 0.6; }
-              50% { opacity: 1; }
-            }
-          `}</style>
-        </div>
-      )}
+        );
+      })()}
       
-      {/* Matrix-inspired error state */}
-      {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm">
-          <div className="font-mono text-lg text-red-500 mb-2 tracking-wider flex items-center">
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            SYSTEM ANOMALY DETECTED
+      {/* Synesthetic loading state */}
+      {isLoading && (() => {
+        // Use a pulsing, calming "neutral" color for loading state
+        const loadingEmotion = 'contemplative'; // Purple hues for loading
+        const colors = emotionColors[loadingEmotion];
+        const [r, g, b] = colors.primary;
+        const [glowR, glowG, glowB] = colors.glow;
+        
+        return (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
+            <div 
+              className="font-mono text-sm mb-2 tracking-wider"
+              style={{ color: `rgb(${r}, ${g}, ${b})` }}
+            >
+              NEURAL NETWORK INITIALIZATION
+            </div>
+            <div 
+              className="w-48 h-1 bg-gray-900 mb-4 relative overflow-hidden"
+              style={{ 
+                borderWidth: '1px', 
+                borderStyle: 'solid', 
+                borderColor: `rgba(${r}, ${g}, ${b}, 0.3)` 
+              }}
+            >
+              <div 
+                className="absolute top-0 left-0 h-full"
+                style={{ 
+                  width: '40%', 
+                  background: `linear-gradient(to right, rgba(${r}, ${g}, ${b}, 0.4), rgba(${r}, ${g}, ${b}, 0.8))`,
+                  boxShadow: `0 0 10px rgba(${glowR}, ${glowG}, ${glowB}, 0.7), 0 0 5px rgba(${glowR}, ${glowG}, ${glowB}, 0.4)`,
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }}
+              ></div>
+            </div>
+            <div 
+              className="font-mono text-xs animate-pulse"
+              style={{ color: `rgba(${r}, ${g}, ${b}, 0.7)` }}
+            >
+              SYNESTHETIC INTERFACE HARMONIZING...
+            </div>
+            <style>{`
+              @keyframes pulse {
+                0%, 100% { opacity: 0.6; }
+                50% { opacity: 1; }
+              }
+            `}</style>
           </div>
-          <div className="text-sm font-mono text-red-300 mb-4 px-4 py-2 border border-red-900/50 bg-black/80">
-            NEURAL CONNECTION FAILURE: MATRIX ACCESS DENIED
+        );
+      })()}
+      
+      {/* Synesthetic error state */}
+      {error && (() => {
+        // Use "angry" emotion colors for error state
+        const errorEmotion = 'angry';
+        const colors = emotionColors[errorEmotion];
+        const [r, g, b] = colors.primary;
+        const [glowR, glowG, glowB] = colors.glow;
+        
+        return (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm">
+            <div 
+              className="font-mono text-lg mb-2 tracking-wider flex items-center"
+              style={{ color: `rgb(${r}, ${g}, ${b})` }}
+            >
+              <svg 
+                className="w-5 h-5 mr-2" 
+                fill="none" 
+                stroke={`rgb(${r}, ${g}, ${b})`} 
+                viewBox="0 0 24 24" 
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              CONSCIOUSNESS DISRUPTION DETECTED
+            </div>
+            <div 
+              className="text-sm font-mono mb-4 px-6 py-3"
+              style={{ 
+                color: `rgba(${r}, ${g}, ${b}, 0.9)`,
+                borderWidth: '1px', 
+                borderStyle: 'solid', 
+                borderColor: `rgba(${r}, ${g}, ${b}, 0.4)`,
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                boxShadow: `0 0 15px rgba(${glowR}, ${glowG}, ${glowB}, 0.2)`
+              }}
+            >
+              NEURAL HARMONY DISRUPTED: SYNESTHETIC PATHWAY FRAGMENTED
+            </div>
+            <div 
+              className="text-xs font-mono max-w-sm text-center"
+              style={{ color: `rgba(${r}, ${g}, ${b}, 0.7)` }}
+            >
+              EMOTIONAL STATE: DISSONANCE [PATTERN:EB31-FD9]
+              <br />RECOMMEND REALIGNMENT OF CONSCIOUSNESS PATHWAYS
+            </div>
           </div>
-          <div className="text-xs font-mono text-red-700 max-w-sm text-center">
-            SYSTEM DIAGNOSTICS: NETWORK DESYNC [CODE:C855-77F]
-            <br />RECOMMEND REINITIALIZATION OF CONSCIOUSNESS INTERFACE
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
