@@ -35,7 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on('message', async (messageData) => {
       try {
         // Parse the message data
-        const message = JSON.parse(messageData.toString());
+        const message = JSON.parse(messageData.toString()) as { type: string; content: string };
         console.log('Received message:', message);
         
         if (message.type === 'chat') {
@@ -52,7 +52,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       } catch (error) {
-        console.error('Error processing WebSocket message:', error);
+        console.error('Error processing WebSocket message:', error instanceof Error ? error.message : 'Unknown error');
         
         // Send error response
         if (ws.readyState === WebSocket.OPEN) {
@@ -82,7 +82,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await dbStorage.createUser(userInput);
       res.status(201).json({ id: user.id, username: user.username, resonancePoints: user.resonancePoints });
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid user data' });
     }
   });
 
@@ -94,7 +94,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ id: user.id, username: user.username, resonancePoints: user.resonancePoints });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to get user' });
     }
   });
 
@@ -105,7 +105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stream = await dbStorage.createStream(streamInput);
       res.status(201).json(stream);
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid stream data' });
     }
   });
 
@@ -114,7 +114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const streams = await dbStorage.getAllStreams();
       res.json(streams);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to get streams' });
     }
   });
 
@@ -125,7 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const kernel = await dbStorage.createKernel(kernelInput);
       res.status(201).json(kernel);
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid kernel data' });
     }
   });
 
@@ -203,11 +203,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Update user's resonance points
-      await dbStorage.incrementUserResonance(resonanceInput.userId);
+      if (resonanceInput.userId) {
+        await dbStorage.incrementUserResonance(resonanceInput.userId);
+      }
       
       res.status(201).json(resonance);
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid resonance data' });
     }
   });
 
