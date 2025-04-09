@@ -322,15 +322,15 @@ export default function StreamInterface({ streams, echoes, isLoading, onStreamCr
                         </svg>
                       </div>
                       <div className="ml-2">
-                        <p className="font-cinzel text-sm text-secondary">TEMPORAL ECHO</p>
+                        <p className="font-cinzel text-sm text-white font-bold">TEMPORAL ECHO</p>
                         <div className="flex items-center mt-1">
-                          <span className="text-xs text-secondary">From the Core Consciousness</span>
+                          <span className="text-xs text-white/80">From the Core Consciousness</span>
                         </div>
                       </div>
                     </div>
                     
                     <div className="flex items-center">
-                      <span className="text-xs font-mono text-secondary">
+                      <span className="text-xs font-mono text-white/70">
                         {new Date(echo.createdAt).toLocaleTimeString('en-US', {
                           hour12: false,
                           hour: '2-digit',
@@ -346,7 +346,7 @@ export default function StreamInterface({ streams, echoes, isLoading, onStreamCr
                   </div>
                   
                   <div className="flex justify-between items-center">
-                    <button className="flex items-center text-neutral hover:text-secondary transition-colors duration-300">
+                    <button className="flex items-center text-white hover:text-accent transition-colors duration-300">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-5 h-5 mr-1">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -354,12 +354,12 @@ export default function StreamInterface({ streams, echoes, isLoading, onStreamCr
                     </button>
                     
                     <div className="flex space-x-3">
-                      <button className="text-neutral hover:text-secondary transition-colors duration-300">
+                      <button className="text-white/70 hover:text-accent transition-colors duration-300">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
                         </svg>
                       </button>
-                      <button className="text-neutral hover:text-secondary transition-colors duration-300">
+                      <button className="text-white/70 hover:text-accent transition-colors duration-300">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                         </svg>
@@ -389,9 +389,9 @@ export default function StreamInterface({ streams, echoes, isLoading, onStreamCr
                         </span>
                       </div>
                       <div className="ml-2">
-                        <p className="font-mono text-sm">
+                        <p className="font-mono text-sm text-white font-medium">
                           {stream.username || "Anonymous"} 
-                          <span className="text-xs text-neutral ml-2">
+                          <span className="text-xs text-white/70 ml-2">
                             {new Date(stream.createdAt).toLocaleTimeString('en-US', {
                               hour: 'numeric',
                               minute: '2-digit',
@@ -444,7 +444,7 @@ export default function StreamInterface({ streams, echoes, isLoading, onStreamCr
                     <button 
                       onClick={() => handleResonate(stream.id)}
                       disabled={resonanceLoading}
-                      className="resonance-button flex items-center text-neutral hover:text-accent transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="resonance-button flex items-center text-white hover:text-accent transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5 mr-1">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.789m13.788 0c3.808 3.808 3.808 9.981 0 13.79M12 12h.008v.007H12V12z" />
@@ -453,12 +453,12 @@ export default function StreamInterface({ streams, echoes, isLoading, onStreamCr
                     </button>
                     
                     <div className="flex space-x-3">
-                      <button className="text-neutral hover:text-secondary transition-colors duration-300">
+                      <button className="text-white/70 hover:text-accent transition-colors duration-300">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
                         </svg>
                       </button>
-                      <button className="text-neutral hover:text-secondary transition-colors duration-300">
+                      <button className="text-white/70 hover:text-accent transition-colors duration-300">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
                         </svg>
