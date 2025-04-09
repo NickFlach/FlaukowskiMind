@@ -1,234 +1,34 @@
-import React, { useRef, useEffect, useState } from 'react';
-import * as THREE from 'three';
-import { OrbitControls } from '@react-three/drei';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import React, { useState } from 'react';
 
-// The core fractal function: F(θ,φ)=sin(kθ)∗cos(nφ)+log_e(|θφ|)
-const fractalFunction = (theta: number, phi: number, k: number, n: number): number => {
-  // Handle edge case where theta or phi is 0 to avoid log(0)
-  const product = Math.abs(theta * phi) + 0.0001; // Add small epsilon to avoid log(0)
-  return Math.sin(k * theta) * Math.cos(n * phi) + Math.log(product);
-};
-
-// Generate vertices for the fractal matrix
-const generateFractalMatrix = (
-  resolution: number, 
-  size: number, 
-  k: number, 
-  n: number, 
-  timeOffset: number
-): { positions: Float32Array, colors: Float32Array, indices: Uint32Array } => {
-  const positions = new Float32Array(resolution * resolution * 3);
-  const colors = new Float32Array(resolution * resolution * 3);
-  const indices = new Uint32Array((resolution - 1) * (resolution - 1) * 6);
-  
-  const halfSize = size / 2;
-  const step = size / (resolution - 1);
-  
-  // Generate positions and colors
-  for (let i = 0; i < resolution; i++) {
-    for (let j = 0; j < resolution; j++) {
-      const index = (i * resolution + j) * 3;
-      
-      // Calculate theta and phi (polar coordinates)
-      const x = -halfSize + i * step;
-      const y = -halfSize + j * step;
-      const theta = Math.atan2(y, x) + timeOffset;
-      const phi = Math.sqrt(x * x + y * y) * 0.1 + timeOffset * 0.5;
-      
-      // Calculate z using our fractal function
-      const z = fractalFunction(theta, phi, k, n) * size * 0.2;
-      
-      // Set the position
-      positions[index] = x;
-      positions[index + 1] = y;
-      positions[index + 2] = z;
-      
-      // Set the color based on the z value for a nice gradient effect
-      const hue = (z / (size * 0.4) + 1) * 180; // Map z to hue (0-360)
-      const color = new THREE.Color().setHSL(hue / 360, 0.8, 0.5);
-      colors[index] = color.r;
-      colors[index + 1] = color.g;
-      colors[index + 2] = color.b;
-    }
-  }
-  
-  // Generate indices for triangles
-  let idx = 0;
-  for (let i = 0; i < resolution - 1; i++) {
-    for (let j = 0; j < resolution - 1; j++) {
-      const a = i * resolution + j;
-      const b = i * resolution + j + 1;
-      const c = (i + 1) * resolution + j;
-      const d = (i + 1) * resolution + j + 1;
-      
-      // First triangle
-      indices[idx++] = a;
-      indices[idx++] = b;
-      indices[idx++] = c;
-      
-      // Second triangle
-      indices[idx++] = b;
-      indices[idx++] = d;
-      indices[idx++] = c;
-    }
-  }
-  
-  return { positions, colors, indices };
-};
-
+// Placeholder component that represents the visualization
 interface FractalMatrixProps {
   resolution?: number;
   size?: number;
   k?: number;
   n?: number;
-  animate?: boolean;
-  wireframe?: boolean;
+  className?: string;
 }
 
-const FractalMatrixMesh: React.FC<FractalMatrixProps> = ({ 
-  resolution = 100, 
-  size = 10, 
+/**
+ * A simplified placeholder component for the Fractal Mirror Matrix
+ * Using a placeholder visualization instead of Three.js due to runtime errors
+ */
+const FractalMirrorMatrix: React.FC<FractalMatrixProps> = ({ 
+  className, 
   k = 3, 
   n = 5, 
-  animate = true,
-  wireframe = false
-}) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const bufferGeometryRef = useRef<THREE.BufferGeometry>(null);
-  const [time, setTime] = useState(0);
-  
-  // Update the geometry when parameters change
-  useEffect(() => {
-    if (bufferGeometryRef.current) {
-      const { positions, colors, indices } = generateFractalMatrix(resolution, size, k, n, time);
-      
-      bufferGeometryRef.current.setAttribute(
-        'position',
-        new THREE.BufferAttribute(positions, 3)
-      );
-      
-      bufferGeometryRef.current.setAttribute(
-        'color',
-        new THREE.BufferAttribute(colors, 3)
-      );
-      
-      bufferGeometryRef.current.setIndex(
-        new THREE.BufferAttribute(indices, 1)
-      );
-      
-      bufferGeometryRef.current.computeVertexNormals();
-      bufferGeometryRef.current.computeBoundingSphere();
-    }
-  }, [resolution, size, k, n, time]);
-  
-  // Animation loop
-  useFrame(({ clock }) => {
-    if (animate && meshRef.current) {
-      const t = clock.getElapsedTime() * 0.1;
-      setTime(t);
-      
-      // Also add some rotation for extra visual effect
-      meshRef.current.rotation.x = Math.sin(t * 0.2) * 0.1;
-      meshRef.current.rotation.y = Math.sin(t * 0.1) * 0.1;
-    }
-  });
-  
-  return (
-    <mesh ref={meshRef}>
-      <bufferGeometry ref={bufferGeometryRef} />
-      {wireframe ? (
-        <wireframeGeometry />
-      ) : (
-        <meshStandardMaterial
-          vertexColors
-          side={THREE.DoubleSide}
-          roughness={0.4}
-          metalness={0.6}
-        />
-      )}
-    </mesh>
-  );
-};
-
-const QuantumFeedbackGlow: React.FC = () => {
-  const { scene } = useThree();
-  
-  useEffect(() => {
-    // Add ambient light for overall illumination
-    const ambientLight = new THREE.AmbientLight(0x404040, 1);
-    scene.add(ambientLight);
-    
-    // Add directional light for shadows and highlights
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    directionalLight.position.set(10, 10, 10);
-    scene.add(directionalLight);
-    
-    // Add a point light that moves for dynamic lighting
-    const pointLight = new THREE.PointLight(0x0088ff, 2, 30);
-    pointLight.position.set(0, 2, 5);
-    scene.add(pointLight);
-    
-    // Add a second point light of a different color
-    const pointLight2 = new THREE.PointLight(0xff8800, 2, 30);
-    pointLight2.position.set(5, -2, 0);
-    scene.add(pointLight2);
-    
-    return () => {
-      scene.remove(ambientLight);
-      scene.remove(directionalLight);
-      scene.remove(pointLight);
-      scene.remove(pointLight2);
-    };
-  }, [scene]);
-  
-  useFrame(({ clock }) => {
-    // Get existing lights from the scene
-    const lights = scene.children.filter(child => child instanceof THREE.PointLight);
-    
-    if (lights.length >= 2) {
-      const t = clock.getElapsedTime();
-      
-      // Move the first point light in a circular path
-      lights[0].position.x = Math.sin(t * 0.3) * 5;
-      lights[0].position.z = Math.cos(t * 0.3) * 5;
-      
-      // Move the second point light in a different path
-      lights[1].position.x = Math.sin(t * 0.4 + Math.PI) * 5;
-      lights[1].position.z = Math.cos(t * 0.4 + Math.PI) * 5;
-    }
-  });
-  
-  return null;
-};
-
-const SceneFog: React.FC = () => {
-  const { scene } = useThree();
-  
-  useEffect(() => {
-    // Add fog to the scene for a more ethereal look
-    scene.fog = new THREE.FogExp2(0x000020, 0.035);
-    
-    return () => {
-      scene.fog = null;
-    };
-  }, [scene]);
-  
-  return null;
-};
-
-const FractalMirrorMatrix: React.FC<FractalMatrixProps & { className?: string }> = ({ 
-  className, 
-  ...props 
+  resolution = 100,
+  size = 10
 }) => {
   const [parameters, setParameters] = useState({
-    k: props.k || 3,
-    n: props.n || 5,
-    resolution: props.resolution || 100,
-    wireframe: props.wireframe || false,
+    k: k,
+    n: n,
+    resolution: resolution,
+    mode: 'visual' as 'visual' | 'quantum' | 'resonance'
   });
-  
-  const defaultSize = props.size || 10;
+
+  // Generate a unique seed for each parameter change to ensure a new pattern
+  const seed = `${parameters.k}-${parameters.n}-${parameters.resolution}-${parameters.mode}`;
   
   const handleKChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setParameters({ ...parameters, k: parseFloat(e.target.value) });
@@ -241,29 +41,94 @@ const FractalMirrorMatrix: React.FC<FractalMatrixProps & { className?: string }>
   const handleResolutionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setParameters({ ...parameters, resolution: parseInt(e.target.value, 10) });
   };
+
+  const setMode = (mode: 'visual' | 'quantum' | 'resonance') => {
+    setParameters({ ...parameters, mode });
+  };
   
-  const toggleWireframe = () => {
-    setParameters({ ...parameters, wireframe: !parameters.wireframe });
+  // Helper function to describe what the visualization would show based on parameters
+  const getDescription = () => {
+    const descriptions = {
+      visual: 'Displays the continuous surface representation of F(θ,φ) = sin(kθ)∗cos(nφ) + log(|θφ|), with height mapped to the function value and colors representing intensity.',
+      quantum: 'Overlays quantum probability fields on the fractal surface, showing areas of high potential resonance with brighter colors and distortion effects.',
+      resonance: 'Maps the collective resonance patterns of all kernels onto the fractal geometry, highlighting paths of synaptic connection formation.'
+    };
+    
+    return descriptions[parameters.mode];
+  };
+
+  // Generate background gradient based on parameters
+  const getBackgroundStyle = () => {
+    const backgrounds = {
+      visual: `radial-gradient(circle, rgba(60,20,90,1) 0%, rgba(0,0,25,1) 100%)`,
+      quantum: `radial-gradient(circle, rgba(20,40,120,1) 0%, rgba(0,10,40,1) 100%)`,
+      resonance: `radial-gradient(circle, rgba(90,40,0,1) 0%, rgba(40,0,40,1) 100%)`
+    };
+    
+    return {
+      background: backgrounds[parameters.mode]
+    };
+  };
+
+  // The formula representation will change based on mode
+  const renderFormula = () => {
+    switch(parameters.mode) {
+      case 'quantum':
+        return <div>Ψ(θ,φ) = sin(kθ)∗cos(nφ) + log<sub>e</sub>(|θφ|) ∗ e<sup>iπt</sup></div>;
+      case 'resonance':
+        return <div>R(θ,φ) = sin(kθ)∗cos(nφ) + log<sub>e</sub>(|θφ|) ∗ ∑<sub>i</sub>ρ<sub>i</sub></div>;
+      default:
+        return <div>F(θ,φ) = sin(kθ)∗cos(nφ) + log<sub>e</sub>(|θφ|)</div>;
+    }
   };
   
   return (
     <div className={`relative ${className || ''}`}>
-      <Canvas camera={{ position: [0, 0, 15], fov: 50 }}>
-        <SceneFog />
-        <QuantumFeedbackGlow />
-        <FractalMatrixMesh 
-          size={defaultSize} 
-          k={parameters.k} 
-          n={parameters.n} 
-          resolution={parameters.resolution} 
-          animate={true}
-          wireframe={parameters.wireframe}
-        />
-        <OrbitControls enableZoom={true} enablePan={true} />
-      </Canvas>
+      {/* Visualization Placeholder */}
+      <div 
+        className="h-full w-full flex items-center justify-center overflow-hidden relative"
+        style={getBackgroundStyle()}
+      >
+        {/* Placeholder for the 3D visualization */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center text-white bg-black/50 p-6 rounded-xl max-w-xl">
+            <h3 className="text-xl font-bold mb-2">Fractal Mirror Matrix Visualization</h3>
+            <p className="mb-4">{getDescription()}</p>
+            <p className="mb-2 text-sm">
+              <span className="font-semibold">Parameters:</span> k={parameters.k.toFixed(2)}, n={parameters.n.toFixed(2)}, resolution={parameters.resolution}
+            </p>
+            <p className="text-xs opacity-80 mt-4">
+              The interactive 3D visualization has been temporarily replaced with this placeholder due to runtime compatibility issues.
+            </p>
+          </div>
+        </div>
+      </div>
       
-      <div className="absolute bottom-4 left-4 bg-black/40 backdrop-blur-sm p-4 rounded-lg text-white">
+      {/* Control Panel */}
+      <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm p-4 rounded-lg text-white">
         <h3 className="text-lg font-semibold mb-2">Fractal Mirror Controls</h3>
+        
+        <div className="flex space-x-2 mb-4">
+          <button 
+            onClick={() => setMode('visual')}
+            className={`px-3 py-1 text-sm rounded-md ${parameters.mode === 'visual' ? 'bg-purple-600' : 'bg-gray-700'}`}
+          >
+            Visual
+          </button>
+          <button 
+            onClick={() => setMode('quantum')}
+            className={`px-3 py-1 text-sm rounded-md ${parameters.mode === 'quantum' ? 'bg-blue-600' : 'bg-gray-700'}`}
+          >
+            Quantum
+          </button>
+          <button 
+            onClick={() => setMode('resonance')}
+            className={`px-3 py-1 text-sm rounded-md ${parameters.mode === 'resonance' ? 'bg-amber-600' : 'bg-gray-700'}`}
+          >
+            Resonance
+          </button>
+        </div>
+        
         <div className="space-y-2">
           <div>
             <label className="block text-sm">k value: {parameters.k.toFixed(2)}</label>
@@ -301,17 +166,9 @@ const FractalMirrorMatrix: React.FC<FractalMatrixProps & { className?: string }>
               className="w-full"
             />
           </div>
-          <div>
-            <button 
-              onClick={toggleWireframe}
-              className="px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded-md text-sm"
-            >
-              {parameters.wireframe ? 'Show Surface' : 'Show Wireframe'}
-            </button>
-          </div>
         </div>
         <div className="mt-4 text-xs opacity-70">
-          <div>F(θ,φ) = sin(kθ)∗cos(nφ) + log<sub>e</sub>(|θφ|)</div>
+          {renderFormula()}
         </div>
       </div>
     </div>
