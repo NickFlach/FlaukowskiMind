@@ -341,7 +341,7 @@ export default function StreamInterface({ streams, echoes, isLoading, onStreamCr
                     </div>
                   </div>
                   
-                  <div className="font-alegreya text-sm leading-relaxed mb-4 text-secondary/90 italic">
+                  <div className="font-alegreya text-base leading-relaxed mb-4 text-white font-medium italic">
                     {echo.content}
                   </div>
                   
@@ -420,19 +420,23 @@ export default function StreamInterface({ streams, echoes, isLoading, onStreamCr
                     </div>
                   </div>
                   
-                  <div className="font-mono text-sm leading-relaxed mb-4">
+                  <div className="font-mono leading-relaxed mb-4">
                     {stream.type === 'code' && (
-                      <div className="p-3 bg-primary/30 rounded mb-3 font-mono text-xs overflow-x-auto">
+                      <div className="p-3 bg-primary/30 rounded mb-3 font-mono text-sm overflow-x-auto text-white">
                         <pre><code>{stream.content}</code></pre>
                       </div>
                     )}
                     
-                    {stream.type !== 'code' && stream.content}
+                    {stream.type !== 'code' && <div className="text-white text-base font-medium">{stream.content}</div>}
                     
                     {stream.tags && stream.tags.length > 0 && (
-                      <span className="block mt-2 text-xs text-neutral">
-                        {stream.tags.map((tag: string) => `#${tag}`).join(' ')}
-                      </span>
+                      <div className="flex flex-wrap gap-1 mt-3">
+                        {stream.tags.map((tag: string, idx: number) => (
+                          <span key={idx} className="text-xs px-2 py-1 bg-primary/20 text-white rounded">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
                   
