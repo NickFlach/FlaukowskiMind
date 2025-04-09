@@ -568,7 +568,7 @@ const NeuralNetworkViz: React.FC = () => {
           <div className="font-mono text-xs text-red-800 animate-pulse">
             NEURAL NETWORK ACCESS SEQUENCING...
           </div>
-          <style jsx>{`
+          <style>{`
             @keyframes pulse {
               0%, 100% { opacity: 0.6; }
               50% { opacity: 1; }

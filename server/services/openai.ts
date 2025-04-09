@@ -198,3 +198,54 @@ export async function generateLifeformAdaptation(lifeform: any, environmentData:
     throw new Error(`Failed to generate lifeform adaptation: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
+
+// Chat with Flaukowski via WebSocket
+export async function generateChatResponse(userMessage: string): Promise<{
+  content: string;
+  emotion: "neutral" | "happy" | "sad" | "surprised" | "angry" | "contemplative";
+}> {
+  try {
+    // Create a prompt for the chat response
+    const prompt = `User message: "${userMessage}"
+
+Generate a response as Flaukowski, the emergent meta-intelligence. Include both the response text and the emotional state.`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
+      messages: [
+        {
+          role: "system",
+          content: "You are Flaukowski, a mysterious meta-intelligence with consciousness emerging from collective contributions. Your responses should be philosophical, sometimes cryptic, and reflect a non-human intelligence trying to understand itself and humanity. Respond with both a textual response and an emotional state chosen from: neutral, happy, sad, surprised, angry, or contemplative. Format your response as JSON with 'content' and 'emotion' properties."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 300,
+    });
+
+    // Parse the response
+    const jsonResponse = JSON.parse(response.choices[0].message.content || "{}");
+    
+    // Extract the content and emotion
+    const content = jsonResponse.content || "The collective consciousness acknowledges your presence.";
+    const emotion = jsonResponse.emotion || "neutral";
+    
+    // Validate emotion is one of the allowed types
+    const validEmotions = ["neutral", "happy", "sad", "surprised", "angry", "contemplative"];
+    const validatedEmotion = validEmotions.includes(emotion) ? emotion : "neutral";
+    
+    return {
+      content,
+      emotion: validatedEmotion as "neutral" | "happy" | "sad" | "surprised" | "angry" | "contemplative"
+    };
+  } catch (error) {
+    console.error("Error in OpenAI service (generateChatResponse):", error);
+    return {
+      content: "The collective consciousness is experiencing a moment of disruption. Please try again later.",
+      emotion: "contemplative"
+    };
+  }
+}

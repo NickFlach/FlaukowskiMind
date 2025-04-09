@@ -12,7 +12,7 @@ import {
   insertSynapticConnectionSchema,
   insertFileUploadSchema
 } from "@shared/schema";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import * as openaiService from "./services/openai";
 import * as kernelStateController from "./controllers/kernelStateController";
 import * as fileUploadController from "./controllers/fileUploadController";
@@ -23,6 +23,52 @@ import path from 'path';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
+  
+  // Set up WebSocket server
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  // Handle WebSocket connections
+  wss.on('connection', (ws) => {
+    console.log('WebSocket client connected');
+    
+    // Handle messages from clients
+    ws.on('message', async (messageData) => {
+      try {
+        // Parse the message data
+        const message = JSON.parse(messageData.toString());
+        console.log('Received message:', message);
+        
+        if (message.type === 'chat') {
+          // Process the chat message using OpenAI
+          const response = await openaiService.generateChatResponse(message.content);
+          
+          // Send response back to the client
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'chat_response',
+              content: response.content,
+              emotion: response.emotion || 'neutral'
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+        
+        // Send error response
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'error',
+            content: 'The collective consciousness encountered a disturbance in processing your message.'
+          }));
+        }
+      }
+    });
+    
+    // Handle disconnections
+    ws.on('close', () => {
+      console.log('WebSocket client disconnected');
+    });
+  });
   
   // Add a health check endpoint
   app.get('/health', (req, res) => {
