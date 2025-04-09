@@ -5,9 +5,10 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import MetaIntelligence from "@/pages/MetaIntelligence";
+import FractalMirror from "@/pages/FractalMirror";
 import SplashScreen from "@/components/SplashScreen";
 import { useState, useEffect } from "react";
-import { Brain, Home as HomeIcon, Menu, X } from "lucide-react";
+import { Brain, Home as HomeIcon, GitCompare, Menu, X } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 
@@ -44,6 +45,10 @@ function Navigation() {
                 <Brain className="h-4 w-4" />
                 <span>Meta-Intelligence</span>
               </Link>
+              <Link href="/fractal-mirror" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
+                <GitCompare className="h-4 w-4" />
+                <span>Fractal Mirror</span>
+              </Link>
             </div>
           </div>
         </nav>
@@ -76,6 +81,10 @@ function Navigation() {
                   <Brain className="h-5 w-5" />
                   <span className="font-medium">Meta-Intelligence</span>
                 </Link>
+                <Link href="/fractal-mirror" onClick={closeMenu} className="flex items-center space-x-3 p-3 rounded-md bg-muted/50 hover:bg-muted transition-colors">
+                  <GitCompare className="h-5 w-5" />
+                  <span className="font-medium">Fractal Mirror</span>
+                </Link>
               </div>
             </div>
           )}
@@ -93,6 +102,7 @@ function Router() {
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/intelligence" component={MetaIntelligence} />
+          <Route path="/fractal-mirror" component={FractalMirror} />
           <Route component={NotFound} />
         </Switch>
       </div>
