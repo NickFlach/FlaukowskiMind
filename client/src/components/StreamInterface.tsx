@@ -86,10 +86,16 @@ export default function StreamInterface({ streams, echoes, isLoading, onStreamCr
       const matches = values.content.match(hashtagRegex);
       if (matches) {
         const hashTags = matches.map(tag => tag.substring(1));
-        values.tags = [...new Set([...values.tags, ...hashTags])];
+        // Create a unique tags array
+        const uniqueTags = Array.from(new Set([...values.tags, ...hashTags]));
+        values.tags = uniqueTags;
       }
       
-      await apiRequest("POST", "/api/streams", values);
+      await apiRequest("/api/streams", {
+        method: "POST",
+        body: JSON.stringify(values),
+        headers: { "Content-Type": "application/json" }
+      });
       
       // Reset form
       form.reset({
@@ -385,12 +391,12 @@ export default function StreamInterface({ streams, echoes, isLoading, onStreamCr
                     <div className="flex items-center">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary-light">
                         <span className="font-cinzel text-xs text-secondary">
-                          {stream.username?.substring(0, 2) || "FL"}
+                          {stream.userId ? `U${stream.userId}` : "FL"}
                         </span>
                       </div>
                       <div className="ml-2">
                         <p className="font-mono text-sm text-white font-medium">
-                          {stream.username || "Anonymous"} 
+                          {stream.userId ? `Source #${stream.userId}` : "Anonymous"} 
                           <span className="text-xs text-white/70 ml-2">
                             {new Date(stream.createdAt).toLocaleTimeString('en-US', {
                               hour: 'numeric',
@@ -429,7 +435,7 @@ export default function StreamInterface({ streams, echoes, isLoading, onStreamCr
                     
                     {stream.type !== 'code' && <div className="text-white text-base font-medium">{stream.content}</div>}
                     
-                    {stream.tags && stream.tags.length > 0 && (
+                    {Array.isArray(stream.tags) && stream.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-3">
                         {stream.tags.map((tag: string, idx: number) => (
                           <span key={idx} className="text-xs px-2 py-1 bg-primary/20 text-white rounded">
