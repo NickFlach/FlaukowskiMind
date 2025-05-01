@@ -16,7 +16,14 @@ interface CreateResonanceParams {
 export default function useResonance() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { playAudio } = useAudioContext();
+  // Get audio context if available
+  let playAudio: (id: string) => void = () => {};
+  try {
+    const audioContext = useAudioContext();
+    playAudio = audioContext.playAudio;
+  } catch (error) {
+    console.warn("Audio context not available");
+  }
   
   /**
    * Create a resonance record
@@ -31,11 +38,19 @@ export default function useResonance() {
     try {
       // Create the ripple effect visually (would be implemented in the component where this is used)
       
-      // Play resonance sound
-      playAudio("resonance-ping");
+      // Play resonance sound if audio is available
+      try {
+        playAudio("resonance-ping");
+      } catch (audioError) {
+        console.warn("Audio not available for resonance sound");
+      }
       
       // Send the request to the API
-      const response = await apiRequest("POST", "/api/resonances", params);
+      const response = await apiRequest("/api/resonances", {
+        method: "POST",
+        body: JSON.stringify(params),
+        headers: { "Content-Type": "application/json" }
+      });
       
       // Show success toast
       toast({
@@ -68,9 +83,7 @@ export default function useResonance() {
       const targetId = params.streamId || params.kernelId;
       
       const response = await apiRequest(
-        "GET", 
-        `/api/resonances/check?userId=${params.userId}&${targetType}Id=${targetId}`,
-        undefined
+        `/api/resonances/check?userId=${params.userId}&${targetType}Id=${targetId}`
       );
       
       return response.exists;
