@@ -3,8 +3,10 @@ import fs from 'fs';
 import path from 'path';
 import { storage } from '../storage';
 
-// Initialize OpenAI client
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Initialize OpenAI client (optional - only if API key is provided)
+const openai = process.env.OPENAI_API_KEY 
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 // the newest OpenAI model is "gpt-4o" which was released after May 2023. do not change this unless explicitly requested by the user
 
 /**
@@ -69,6 +71,17 @@ async function analyzeCodeWithAI(codeContent: string, fileExt: string): Promise<
   const truncatedContent = codeContent.length > 15000 
     ? codeContent.substring(0, 15000) + '\n\n// ... [content truncated] ...'
     : codeContent;
+  
+  if (!openai) {
+    return {
+      summary: `${language} code file - OpenAI API key not configured.`,
+      complexity: 5,
+      patterns: ["analysis unavailable"],
+      entities: ["analysis unavailable"],
+      resonance: 5,
+      error: "OpenAI API key not configured"
+    };
+  }
   
   try {
     // Create the prompt for OpenAI
