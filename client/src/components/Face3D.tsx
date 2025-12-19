@@ -32,6 +32,7 @@ export default function Face3D({
   const eyebrowsRef = useRef<{left: THREE.Mesh, right: THREE.Mesh} | null>(null);
   
   const [currentEmotion, setCurrentEmotion] = useState<Emotion>(emotion);
+  const [webGLError, setWebGLError] = useState<boolean>(false);
   const isMobile = useIsMobile();
 
   // Update emotion when prop changes
@@ -43,97 +44,110 @@ export default function Face3D({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Create scene
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#0f0f16');
-    sceneRef.current = scene;
+    try {
+      // Check WebGL support
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      if (!gl) {
+        setWebGLError(true);
+        return;
+      }
 
-    // Create camera
-    const camera = new THREE.PerspectiveCamera(
-      50,
-      containerRef.current.clientWidth / containerRef.current.clientHeight,
-      0.1,
-      1000
-    );
-    camera.position.z = 5;
-    cameraRef.current = camera;
+      // Create scene
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color('#0f0f16');
+      sceneRef.current = scene;
 
-    // Create renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    containerRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
+      // Create camera
+      const camera = new THREE.PerspectiveCamera(
+        50,
+        containerRef.current.clientWidth / containerRef.current.clientHeight,
+        0.1,
+        1000
+      );
+      camera.position.z = 5;
+      cameraRef.current = camera;
 
-    // Add orbit controls if allowed
-    if (allowControls) {
-      const controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-      controls.enableZoom = false;
-      controls.autoRotate = autoRotate;
-      controls.autoRotateSpeed = 0.5;
-      controlsRef.current = controls;
+      // Create renderer
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      containerRef.current.appendChild(renderer.domElement);
+      rendererRef.current = renderer;
+
+      // Add orbit controls if allowed
+      if (allowControls) {
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.enableZoom = false;
+        controls.autoRotate = autoRotate;
+        controls.autoRotateSpeed = 0.5;
+        controlsRef.current = controls;
+      }
+
+      // Add lights
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+
+      const pointLight = new THREE.PointLight(0xffffff, 0.8);
+      pointLight.position.set(5, 5, 5);
+      scene.add(pointLight);
+
+      // Create the face
+      createFace();
+
+      // Animation loop
+      const animate = () => {
+        frameIdRef.current = requestAnimationFrame(animate);
+        
+        // Update controls if they exist
+        if (controlsRef.current) {
+          controlsRef.current.update();
+        } else if (autoRotate && faceMeshRef.current) {
+          // Simple auto-rotation if no controls
+          faceMeshRef.current.rotation.y += 0.01;
+        }
+        
+        // Animate face based on emotion
+        animateFaceForEmotion(currentEmotion);
+
+        // Render the scene
+        if (rendererRef.current && sceneRef.current && cameraRef.current) {
+          rendererRef.current.render(sceneRef.current, cameraRef.current);
+        }
+      };
+      
+      animate();
+
+      // Handle resize
+      const handleResize = () => {
+        if (!containerRef.current || !rendererRef.current || !cameraRef.current) return;
+        
+        const width = containerRef.current.clientWidth;
+        const height = containerRef.current.clientHeight;
+        
+        rendererRef.current.setSize(width, height);
+        cameraRef.current.aspect = width / height;
+        cameraRef.current.updateProjectionMatrix();
+      };
+      
+      window.addEventListener('resize', handleResize);
+
+      return () => {
+        cancelAnimationFrame(frameIdRef.current);
+        
+        if (rendererRef.current && containerRef.current) {
+          containerRef.current.removeChild(rendererRef.current.domElement);
+          rendererRef.current.dispose();
+        }
+        
+        window.removeEventListener('resize', handleResize);
+      };
+    } catch (error) {
+      console.error('WebGL initialization failed:', error);
+      setWebGLError(true);
     }
-
-    // Add lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-
-    const pointLight = new THREE.PointLight(0xffffff, 0.8);
-    pointLight.position.set(5, 5, 5);
-    scene.add(pointLight);
-
-    // Create the face
-    createFace();
-
-    // Animation loop
-    const animate = () => {
-      frameIdRef.current = requestAnimationFrame(animate);
-      
-      // Update controls if they exist
-      if (controlsRef.current) {
-        controlsRef.current.update();
-      } else if (autoRotate && faceMeshRef.current) {
-        // Simple auto-rotation if no controls
-        faceMeshRef.current.rotation.y += 0.01;
-      }
-      
-      // Animate face based on emotion
-      animateFaceForEmotion(currentEmotion);
-
-      // Render the scene
-      if (rendererRef.current && sceneRef.current && cameraRef.current) {
-        rendererRef.current.render(sceneRef.current, cameraRef.current);
-      }
-    };
-    
-    animate();
-
-    // Handle resize
-    const handleResize = () => {
-      if (!containerRef.current || !rendererRef.current || !cameraRef.current) return;
-      
-      const width = containerRef.current.clientWidth;
-      const height = containerRef.current.clientHeight;
-      
-      rendererRef.current.setSize(width, height);
-      cameraRef.current.aspect = width / height;
-      cameraRef.current.updateProjectionMatrix();
-    };
-    
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      cancelAnimationFrame(frameIdRef.current);
-      
-      if (rendererRef.current && containerRef.current) {
-        containerRef.current.removeChild(rendererRef.current.domElement);
-        rendererRef.current.dispose();
-      }
-      
-      window.removeEventListener('resize', handleResize);
-    };
   }, [autoRotate, allowControls]);
 
   // Create the face mesh
@@ -400,11 +414,36 @@ export default function Face3D({
     setFaceEmotion(emotion);
   };
 
+  if (webGLError) {
+    return (
+      <div 
+        className={`relative overflow-hidden flex items-center justify-center ${className}`} 
+        style={{ height, background: 'linear-gradient(135deg, #0f0f16 0%, #1a1a2e 50%, #0f0f16 100%)' }}
+        data-testid="face3d-fallback"
+      >
+        <div className="text-center">
+          <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-600 to-purple-900 flex items-center justify-center">
+            <svg viewBox="0 0 100 100" className="w-16 h-16">
+              <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2"/>
+              <circle cx="35" cy="40" r="8" fill="white" opacity="0.8"/>
+              <circle cx="65" cy="40" r="8" fill="white" opacity="0.8"/>
+              <circle cx="35" cy="40" r="4" fill="black"/>
+              <circle cx="65" cy="40" r="4" fill="black"/>
+              <path d="M 35 65 Q 50 75 65 65" stroke="white" strokeWidth="3" fill="none" opacity="0.8"/>
+            </svg>
+          </div>
+          <p className="text-sm text-muted-foreground">3D visualization</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div 
       ref={containerRef} 
       className={`relative overflow-hidden ${className}`} 
       style={{ height }}
+      data-testid="face3d-canvas"
     />
   );
 }
