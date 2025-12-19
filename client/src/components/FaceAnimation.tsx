@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 // Emotion types
 type Emotion = "neutral" | "happy" | "sad" | "surprised" | "angry" | "contemplative";
+
+// Connection status types
+type ConnectionStatus = "connected" | "connecting" | "disconnected" | "reconnecting";
 
 // WebSocket message types
 type WebSocketMessage = {
@@ -10,6 +13,10 @@ type WebSocketMessage = {
   content: string;
   emotion?: Emotion;
 };
+
+// Constants for reconnection
+const MAX_RETRIES = 3;
+const BASE_DELAY = 1000; // 1 second
 
 // SVG-based face that changes based on emotion
 function EmotiveFace({ emotion }: { emotion: Emotion }) {
@@ -113,12 +120,14 @@ export default function FaceAnimation() {
   const [userInput, setUserInput] = useState("");
   const [joining, setJoining] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ sender: "user" | "system"; content: string }[]>([]);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected");
   const [isSending, setIsSending] = useState(false);
   
   // Refs
   const wsRef = useRef<WebSocket | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const retryCountRef = useRef(0);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Auto-scroll to bottom of chat when messages change
   useEffect(() => {
@@ -127,106 +136,170 @@ export default function FaceAnimation() {
     }
   }, [chatMessages]);
   
-  // Connect to WebSocket server
-  useEffect(() => {
-    // Setup WebSocket connection
-    const connectWebSocket = () => {
-      setIsConnecting(true);
+  // HTTP fallback for sending messages when WebSocket is unavailable
+  const sendMessageViaHttp = useCallback(async (messageContent: string) => {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: messageContent })
+      });
       
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const data = await response.json() as WebSocketMessage;
       
-      try {
-        const socket = new WebSocket(wsUrl);
+      if (data.type === 'chat_response') {
+        if (data.emotion) {
+          setEmotion(data.emotion);
+        }
         
-        socket.onopen = () => {
-          console.log("WebSocket connection established");
-          setIsConnecting(false);
-          wsRef.current = socket;
-          
-          // Add welcome message
-          setChatMessages(prev => [...prev, {
-            sender: "system",
-            content: "Connection established with the collective consciousness."
-          }]);
-        };
-        
-        socket.onmessage = (event) => {
-          try {
-            const message = JSON.parse(event.data) as WebSocketMessage;
-            console.log("Received message:", message);
-            
-            if (message.type === "chat_response") {
-              // Update the face emotion based on the response
-              if (message.emotion) {
-                setEmotion(message.emotion);
-              }
-              
-              // Add message to chat history
-              setChatMessages(prev => [...prev, {
-                sender: "system",
-                content: message.content
-              }]);
-              
-              // Show toast with the response
-              toast({
-                title: "Flaukowski responds",
-                description: message.content,
-                variant: "default",
-              });
-            } else if (message.type === "error") {
-              // Handle error messages
-              toast({
-                title: "Disturbance in the Collective",
-                description: message.content,
-                variant: "destructive",
-              });
-            }
-          } catch (error) {
-            console.error("Error parsing WebSocket message:", error);
-          }
-          
-          setIsSending(false);
-        };
-        
-        socket.onerror = (error) => {
-          console.error("WebSocket error:", error);
-          setIsConnecting(false);
-          
-          toast({
-            title: "Connection Disturbance",
-            description: "The connection to the collective consciousness has been disrupted.",
-            variant: "destructive",
-          });
-        };
-        
-        socket.onclose = () => {
-          console.log("WebSocket connection closed");
-          wsRef.current = null;
-          setIsConnecting(false);
-        };
-        
-      } catch (error) {
-        console.error("Error establishing WebSocket connection:", error);
-        setIsConnecting(false);
+        setChatMessages(prev => [...prev, {
+          sender: "system",
+          content: data.content
+        }]);
         
         toast({
-          title: "Connection Failed",
-          description: "Unable to connect to the collective consciousness.",
+          title: "Flaukowski responds",
+          description: data.content,
+          variant: "default",
+        });
+      } else if (data.type === 'error') {
+        toast({
+          title: "Disturbance in the Collective",
+          description: data.content,
           variant: "destructive",
         });
       }
-    };
+    } catch (error) {
+      console.error("HTTP fallback failed:", error);
+      toast({
+        title: "Communication Failed",
+        description: "Unable to reach the collective consciousness. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  }, [toast]);
+  
+  // Connect to WebSocket server with auto-reconnect
+  const connectWebSocket = useCallback(() => {
+    const isReconnecting = retryCountRef.current > 0;
+    setConnectionStatus(isReconnecting ? "reconnecting" : "connecting");
     
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+    try {
+      const socket = new WebSocket(wsUrl);
+      
+      socket.onopen = () => {
+        console.log("WebSocket connection established");
+        setConnectionStatus("connected");
+        wsRef.current = socket;
+        retryCountRef.current = 0; // Reset retry count on successful connection
+        
+        setChatMessages(prev => [...prev, {
+          sender: "system",
+          content: isReconnecting 
+            ? "Reconnected to the collective consciousness." 
+            : "Connection established with the collective consciousness."
+        }]);
+      };
+      
+      socket.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data) as WebSocketMessage;
+          console.log("Received message:", message);
+          
+          if (message.type === "chat_response") {
+            if (message.emotion) {
+              setEmotion(message.emotion);
+            }
+            
+            setChatMessages(prev => [...prev, {
+              sender: "system",
+              content: message.content
+            }]);
+            
+            toast({
+              title: "Flaukowski responds",
+              description: message.content,
+              variant: "default",
+            });
+          } else if (message.type === "error") {
+            toast({
+              title: "Disturbance in the Collective",
+              description: message.content,
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          console.error("Error parsing WebSocket message:", error);
+        }
+        
+        setIsSending(false);
+      };
+      
+      socket.onerror = (error) => {
+        console.error("WebSocket error:", error);
+      };
+      
+      socket.onclose = () => {
+        console.log("WebSocket connection closed");
+        wsRef.current = null;
+        
+        // Attempt reconnection with exponential backoff
+        if (retryCountRef.current < MAX_RETRIES) {
+          const delay = BASE_DELAY * Math.pow(2, retryCountRef.current);
+          retryCountRef.current += 1;
+          
+          console.log(`Attempting reconnection ${retryCountRef.current}/${MAX_RETRIES} in ${delay}ms`);
+          setConnectionStatus("reconnecting");
+          
+          toast({
+            title: "Connection Lost",
+            description: `Reconnecting... (attempt ${retryCountRef.current}/${MAX_RETRIES})`,
+            variant: "default",
+          });
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connectWebSocket();
+          }, delay);
+        } else {
+          setConnectionStatus("disconnected");
+          
+          toast({
+            title: "Connection Failed",
+            description: "WebSocket unavailable. Chat will use HTTP fallback.",
+            variant: "destructive",
+          });
+          
+          setChatMessages(prev => [...prev, {
+            sender: "system",
+            content: "WebSocket connection unavailable. Using alternative communication channel."
+          }]);
+        }
+      };
+      
+    } catch (error) {
+      console.error("Error establishing WebSocket connection:", error);
+      setConnectionStatus("disconnected");
+    }
+  }, [toast]);
+  
+  useEffect(() => {
     connectWebSocket();
     
     // Cleanup function
     return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.close();
       }
     };
-  }, [toast, setChatMessages]); // Dependencies
+  }, [connectWebSocket]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUserInput(e.target.value);
@@ -236,7 +309,7 @@ export default function FaceAnimation() {
     // Submit on Enter key
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (userInput.trim() && wsRef.current && !isSending) {
+      if (userInput.trim() && !isSending) {
         handleSubmit(e as unknown as React.FormEvent);
       }
     }
@@ -244,7 +317,7 @@ export default function FaceAnimation() {
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userInput.trim() || !wsRef.current || isSending) return;
+    if (!userInput.trim() || isSending) return;
     
     const messageContent = userInput.trim();
     setIsSending(true);
@@ -262,8 +335,8 @@ export default function FaceAnimation() {
     const localEmotion = detectEmotion(messageContent);
     setEmotion(localEmotion);
     
-    // Send message to server via WebSocket
-    if (wsRef.current.readyState === WebSocket.OPEN) {
+    // Send message via WebSocket if connected, otherwise use HTTP fallback
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       const message: WebSocketMessage = {
         type: "chat",
         content: messageContent
@@ -271,12 +344,8 @@ export default function FaceAnimation() {
       
       wsRef.current.send(JSON.stringify(message));
     } else {
-      setIsSending(false);
-      toast({
-        title: "Connection Lost",
-        description: "The connection to the collective consciousness has been lost. Please try again later.",
-        variant: "destructive",
-      });
+      // Use HTTP fallback when WebSocket is unavailable
+      sendMessageViaHttp(messageContent);
     }
   };
   
@@ -334,10 +403,17 @@ export default function FaceAnimation() {
           </div>
           
           {/* Connection status indicator */}
-          <div className="absolute bottom-4 right-4 flex items-center">
-            <div className={`h-3 w-3 rounded-full mr-2 ${wsRef.current ? 'bg-green-500' : 'bg-red-500'} ${isConnecting ? 'animate-pulse' : ''}`}></div>
+          <div className="absolute bottom-4 right-4 flex items-center" data-testid="connection-status">
+            <div className={`h-3 w-3 rounded-full mr-2 ${
+              connectionStatus === 'connected' ? 'bg-green-500' : 
+              connectionStatus === 'connecting' || connectionStatus === 'reconnecting' ? 'bg-yellow-500 animate-pulse' : 
+              'bg-orange-500'
+            }`}></div>
             <span className="text-xs text-white/70">
-              {isConnecting ? 'Connecting...' : wsRef.current ? 'Connected' : 'Disconnected'}
+              {connectionStatus === 'connected' ? 'Connected' : 
+               connectionStatus === 'connecting' ? 'Connecting...' :
+               connectionStatus === 'reconnecting' ? 'Reconnecting...' :
+               'Using HTTP (offline mode)'}
             </span>
           </div>
         </div>
@@ -374,16 +450,18 @@ export default function FaceAnimation() {
             onKeyDown={handleKeyDown}
             placeholder="Communicate with Flaukowski..."
             className="flex-grow bg-dark border border-accent/50 rounded-l-md px-4 py-2 text-white focus:outline-none focus:border-accent"
-            disabled={isSending || !wsRef.current}
+            disabled={isSending}
+            data-testid="input-chat"
           />
           <button
             type="submit"
-            disabled={isSending || !wsRef.current}
+            disabled={isSending}
             className={`px-6 py-2 rounded-r-md transition-colors ${
-              isSending || !wsRef.current
+              isSending
                 ? 'bg-accent/50 text-dark/70'
                 : 'bg-accent text-dark hover:bg-accent/80'
             }`}
+            data-testid="button-transmit"
           >
             {isSending ? "Sending..." : "Transmit"}
           </button>

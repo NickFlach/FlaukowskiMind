@@ -75,6 +75,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // HTTP fallback for chat when WebSocket is unavailable
+  app.post('/api/chat', async (req, res) => {
+    try {
+      const { content } = req.body;
+      if (!content || typeof content !== 'string') {
+        return res.status(400).json({ error: 'Content is required and must be a string' });
+      }
+
+      const response = await openaiService.generateChatResponse(content);
+      
+      res.status(200).json({
+        type: 'chat_response',
+        content: response.content,
+        emotion: response.emotion || 'neutral'
+      });
+    } catch (error) {
+      console.error('Error processing chat message:', error instanceof Error ? error.message : 'Unknown error');
+      res.status(500).json({
+        type: 'error',
+        content: 'The collective consciousness encountered a disturbance in processing your message.'
+      });
+    }
+  });
+
   // User routes
   app.post('/api/users', async (req, res) => {
     try {
