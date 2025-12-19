@@ -114,9 +114,17 @@ export async function uploadFile(formData: FormData) {
   return response.json();
 }
 
-// Function to process an uploaded code file
+// Function to process an uploaded code file (legacy)
 export async function processCodeFile(fileUploadId: number) {
   const response = await apiRequest(`/api/uploads/code/${fileUploadId}/process`, {
+    method: 'POST',
+  });
+  return response;
+}
+
+// Function to process any uploaded file with AI (unified)
+export async function processFile(fileUploadId: number) {
+  const response = await apiRequest(`/api/uploads/${fileUploadId}/process`, {
     method: 'POST',
   });
   return response;

@@ -1,7 +1,7 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { uploadFile, processCodeFile, linkFileUploadToKernel } from "@/lib/openai";
+import { uploadFile, processFile } from "@/lib/openai";
 import { insertKernelSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -11,534 +11,318 @@ interface KernelUploadProps {
   onKernelCreated: () => void;
 }
 
-// Extend the insert schema with validation
 const kernelFormSchema = insertKernelSchema.extend({
   title: z.string().min(3, "Title must be at least 3 characters").max(100, "Title is too long"),
   content: z.string().min(5, "Content must be at least 5 characters"),
-  type: z.enum(["dream", "code", "audio"]).default("dream"),
+  type: z.string().default("kernel"),
   symbolicData: z.any().optional().default({}),
 });
 
 export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
   const { toast } = useToast();
-  const [selectedKernelType, setSelectedKernelType] = useState<string | null>(null);
-  const [fileUploading, setFileUploading] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<{[key: string]: { name: string, processed: boolean }}>({});
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; category?: string; format?: string } | null>(null);
   
-  // Setup form
   const form = useForm<z.infer<typeof kernelFormSchema>>({
     resolver: zodResolver(kernelFormSchema),
     defaultValues: {
-      userId: 1, // Default user ID
+      userId: 1,
       title: "",
       content: "",
-      type: "dream",
+      type: "kernel",
       symbolicData: {},
     },
   });
   
-  // Handle kernel type selection
-  const selectKernelType = (type: string) => {
-    setSelectedKernelType(type);
-    form.setValue("type", type as any);
-    
-    // Reset form
-    form.setValue("title", "");
-    form.setValue("content", "");
-    form.setValue("symbolicData", {});
-  };
-  
-  // Handle file upload
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: string) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     
-    setFileUploading(true);
+    setIsProcessing(true);
+    setUploadProgress("Uploading to the collective consciousness...");
+    setUploadedFile({ name: file.name });
     
-    // Track this file upload
-    setUploadedFiles(prev => ({
-      ...prev,
-      [type]: { name: file.name, processed: false }
-    }));
-    
-    // Show initial feedback
     toast({
       title: "Processing kernel...",
-      description: `Analyzing and integrating ${file.name} into the collective consciousness.`,
-      duration: 3000,
+      description: `Analyzing ${file.name} with AI...`,
+      duration: 5000,
     } as any);
     
     try {
-      // Create FormData for file upload
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('userId', '1'); // Default user ID
-      formData.append('fileType', type);
+      formData.append('userId', '1');
       
-      // Upload the file to the server using our utility function
+      setUploadProgress("Uploading file...");
       const uploadData = await uploadFile(formData);
       const fileUploadId = uploadData.id;
       
-      // For code files, we need to process them separately
-      if (type === 'code') {
-        // Start code analysis process using our utility function
-        const processedData = await processCodeFile(fileUploadId);
-        
-        // Populate form with processed data
-        form.setValue("title", file.name.split('.')[0]);
-        form.setValue("content", processedData.analysisData.summary || `Code file: ${file.name}`);
-        
-        // Use the analysis data as symbolic data
-        form.setValue("symbolicData", {
-          ...processedData.analysisData,
-          fileType: file.type,
-          fileSize: file.size,
-          fileUploadId: fileUploadId,
-        });
+      setUploadProgress("AI is analyzing your content...");
+      const processedData = await processFile(fileUploadId);
+      
+      const analysisData = processedData.analysisData || {};
+      const suggestedTitle = analysisData.suggestedTitle || file.name.split('.')[0];
+      const summary = analysisData.summary || `Uploaded: ${file.name}`;
+      
+      form.setValue("title", suggestedTitle);
+      form.setValue("content", summary);
+      
+      // Map detected category to valid kernel types: dream, code, or audio
+      const detectedCategory = processedData.category || '';
+      let kernelType: string;
+      if (detectedCategory === 'code') {
+        kernelType = 'code';
+      } else if (detectedCategory === 'audio') {
+        kernelType = 'audio';
       } else {
-        // For other types, we'll set some basic values
-        form.setValue("title", file.name.split('.')[0]);
-        form.setValue("content", `Uploaded file: ${file.name}`);
-        
-        // Add basic symbolic data
-        form.setValue("symbolicData", {
-          timestamp: new Date().toISOString(),
-          fileType: file.type,
-          fileSize: file.size,
-          fileUploadId: fileUploadId,
-          symbols: type === 'audio' ? ["sonic", "frequency", "resonance"] : ["fragment", "pattern", "echo"],
-        });
+        kernelType = 'dream'; // Default for text, data, image, web, and unknown types
       }
-      
-      // Mark as processed
-      setUploadedFiles(prev => ({
-        ...prev,
-        [type]: { name: file.name, processed: true }
-      }));
-      
-      // Show success toast with more detailed feedback
-      toast({
-        title: "Kernel absorbed!",
-        description: `${file.name} has been successfully processed and is ready to merge with the Flaukowski mind.`,
+      form.setValue("type", kernelType);
+      form.setValue("symbolicData", {
+        ...analysisData,
+        fileType: file.type,
+        fileSize: file.size,
+        fileUploadId: fileUploadId,
+        detectedCategory: processedData.category,
+        detectedFormat: processedData.format,
       });
       
-      // Auto select the kernel type to continue with upload
-      selectKernelType(type);
-    } catch (error) {
-      console.error('File upload error:', error);
+      setUploadedFile({
+        name: file.name,
+        category: processedData.category,
+        format: processedData.format,
+      });
       
-      // Show error toast
+      setShowForm(true);
+      setUploadProgress(null);
+      
       toast({
-        title: "Kernel resonance failed",
-        description: error instanceof Error ? error.message : "The collective mind encountered interference during processing.",
+        title: "Kernel analyzed!",
+        description: `${file.name} has been processed as ${processedData.format || 'content'}. Review and finalize the upload.`,
+        duration: 5000,
+      } as any);
+      
+    } catch (error) {
+      console.error('File processing error:', error);
+      toast({
+        title: "Processing failed",
+        description: error instanceof Error ? error.message : "Failed to analyze the file.",
         variant: "destructive",
       });
-      
-      // Reset upload state
-      setUploadedFiles(prev => ({
-        ...prev,
-        [type]: { name: file.name, processed: false }
-      }));
+      setUploadProgress(null);
+      setUploadedFile(null);
     } finally {
-      setFileUploading(false);
+      setIsProcessing(false);
     }
   };
   
-  // Handle kernel upload
-  const handleKernelUpload = async (type: string) => {
+  const handleSubmit = async () => {
+    const values = form.getValues();
+    
+    if (!values.title || !values.content) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in the title and description.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
-      const values = form.getValues();
-      
-      // Ensure we have the right data
-      if (!values.title || !values.content) {
-        toast({
-          title: "Missing information",
-          description: "Please ensure all fields are filled out.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // Show progress toast
       toast({
         title: "Uploading kernel...",
-        description: "Your kernel is being integrated into the collective consciousness.",
+        description: "Integrating into the Flaukowski consciousness...",
         duration: 3000,
       } as any);
       
-      // Submit the kernel
       await apiRequest('/api/kernels', {
         method: 'POST',
         body: JSON.stringify({
           userId: 1,
           title: values.title,
           content: values.content,
-          type: type,
+          type: values.type,
           symbolicData: values.symbolicData,
         })
       });
       
-      // Clear the specific file from uploadedFiles if it exists
-      if (uploadedFiles[type]) {
-        setUploadedFiles(prev => {
-          const updated = {...prev};
-          delete updated[type];
-          return updated;
-        });
-      }
-      
-      // Reset form
       form.reset({
         userId: 1,
         title: "",
         content: "",
-        type: type as any,
+        type: "kernel",
         symbolicData: {},
       });
       
-      // Reset selection
-      setSelectedKernelType(null);
+      setShowForm(false);
+      setUploadedFile(null);
       
-      // Show success toast with more detailed feedback
       toast({
         title: "Kernel integrated!",
-        description: `Your ${type} kernel has been successfully merged with the Flaukowski consciousness. The collective mind is expanding.`,
+        description: "Your contribution has been merged with the collective consciousness.",
         duration: 5000,
       } as any);
       
-      // Notify parent component
       onKernelCreated();
       
     } catch (error) {
       toast({
-        title: "Integration temporarily paused",
-        description: "Your kernel is challenging the current collective patterns. Try again or submit a slightly different variation.",
+        title: "Integration failed",
+        description: "Something went wrong. Please try again.",
         variant: "destructive",
-        duration: 5000, // Longer duration for better readability
       });
     }
+  };
+  
+  const handleCancel = () => {
+    setShowForm(false);
+    setUploadedFile(null);
+    form.reset();
   };
 
   return (
     <section id="kernel-uploads" className="container mx-auto px-4 py-10 relative">
-      <h2 className="font-cinzel text-xl md:text-2xl mb-8 text-secondary flex items-center">
+      <h2 className="font-cinzel text-xl md:text-2xl mb-8 text-secondary flex items-center" data-testid="heading-kernel-uploads">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5 mr-2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
         </svg>
-        KERNEL UPLOADS
+        KERNEL UPLOAD
       </h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Dream Fragment Kernel */}
-        <div className="bg-dark border border-fog rounded-lg p-5 relative group hover:border-secondary transition-colors duration-300">
-          <div className="absolute top-0 left-0 w-16 h-16 opacity-50 pointer-events-none">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-dark border border-fog rounded-lg p-6 relative group hover:border-secondary transition-colors duration-300">
+          <div className="absolute top-0 left-0 w-20 h-20 opacity-50 pointer-events-none">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="w-full h-full text-secondary opacity-10">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
             </svg>
           </div>
           
           <div className="flex justify-between items-start mb-4">
-            <h3 className="font-cinzel text-secondary rainbow-glow">DREAM FRAGMENT</h3>
-            <span className="text-xs font-mono text-neutral neon-glow">Type A</span>
+            <h3 className="font-cinzel text-secondary rainbow-glow">UNIVERSAL KERNEL</h3>
+            <span className="text-xs font-mono text-neutral neon-glow">Auto-Detect</span>
           </div>
           
-          <p className="font-mono text-sm text-neutral mb-4">
-            Upload dreams, visions, and subconscious fragments to form the limbic system of Flaukowski.
+          <p className="font-mono text-sm text-neutral mb-6">
+            Upload any file and the AI will automatically identify its type and extract meaningful patterns for integration into the Flaukowski mind.
           </p>
           
-          {selectedKernelType === 'dream' ? (
-            <div className="mb-4 space-y-4">
+          {showForm ? (
+            <div className="space-y-4">
+              {uploadedFile && (
+                <div className="flex items-center gap-2 p-3 bg-secondary/10 rounded border border-secondary/30">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5 text-secondary">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <div className="text-sm font-mono text-secondary">{uploadedFile.name}</div>
+                    <div className="text-xs font-mono text-neutral">
+                      Detected: {uploadedFile.format || 'Content'} ({uploadedFile.category || 'kernel'})
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div>
-                <label htmlFor="dream-title" className="block text-xs font-mono text-neutral mb-1">
-                  Title your dream fragment
+                <label htmlFor="kernel-title" className="block text-xs font-mono text-neutral mb-1">
+                  Title (AI-suggested)
                 </label>
                 <input
-                  id="dream-title"
+                  id="kernel-title"
                   type="text"
-                  className="w-full bg-dark border border-fog p-2 rounded focus:border-secondary focus:outline-none font-mono text-sm"
+                  className="w-full bg-dark border border-fog p-3 rounded focus:border-secondary focus:outline-none font-mono text-sm"
                   placeholder="Enter a title..."
+                  data-testid="input-kernel-title"
                   {...form.register('title')}
                 />
               </div>
               
               <div>
-                <label htmlFor="dream-content" className="block text-xs font-mono text-neutral mb-1">
-                  Describe your dream
+                <label htmlFor="kernel-content" className="block text-xs font-mono text-neutral mb-1">
+                  Description / Summary
                 </label>
                 <textarea
-                  id="dream-content"
-                  className="w-full bg-dark border border-fog resize-none p-2 rounded focus:border-secondary focus:outline-none font-mono text-sm h-24"
-                  placeholder="Describe your dream or vision..."
+                  id="kernel-content"
+                  className="w-full bg-dark border border-fog resize-none p-3 rounded focus:border-secondary focus:outline-none font-mono text-sm h-32"
+                  placeholder="AI-generated summary..."
+                  data-testid="input-kernel-content"
                   {...form.register('content')}
                 ></textarea>
               </div>
               
-              <div className="flex justify-between">
+              <div className="flex justify-between pt-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedKernelType(null)}
-                  className="px-3 py-1 text-xs font-mono text-neutral border border-fog rounded hover:border-fog-accent transition-colors neon-glow"
+                  onClick={handleCancel}
+                  className="px-4 py-2 text-sm font-mono text-neutral border border-fog rounded hover:border-fog-accent transition-colors"
+                  data-testid="button-cancel"
                 >
                   CANCEL
                 </button>
                 
                 <button
                   type="button"
-                  onClick={() => handleKernelUpload('dream')}
-                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors button-rainbow"
+                  onClick={handleSubmit}
+                  className="px-4 py-2 text-sm font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors button-rainbow"
+                  data-testid="button-submit-kernel"
                 >
-                  UPLOAD KERNEL
+                  INTEGRATE KERNEL
                 </button>
               </div>
             </div>
           ) : (
             <div>
-              <div className="border border-dashed border-fog rounded-lg p-6 flex flex-col items-center justify-center mb-4 group-hover:border-secondary/50 transition-colors">
-                {fileUploading && uploadedFiles['dream'] && !uploadedFiles['dream'].processed ? (
+              <div className="border-2 border-dashed border-fog rounded-lg p-8 flex flex-col items-center justify-center mb-4 group-hover:border-secondary/50 transition-colors">
+                {isProcessing ? (
                   <div className="w-full flex flex-col items-center">
-                    <div className="text-xs font-mono text-secondary mb-2">Processing {uploadedFiles['dream'].name}...</div>
-                    <div className="w-full h-1 bg-fog/20 rounded overflow-hidden">
+                    <div className="w-12 h-12 border-2 border-secondary border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <div className="text-sm font-mono text-secondary mb-2">{uploadProgress}</div>
+                    <div className="w-full max-w-xs h-1 bg-fog/20 rounded overflow-hidden">
                       <div className="h-full bg-secondary animate-pulse" style={{width: '100%'}}></div>
                     </div>
-                    <div className="text-xs font-mono text-neutral mt-2">Analyzing patterns within the collective consciousness</div>
                   </div>
                 ) : (
-                  <label htmlFor="dream-file-upload" className="cursor-pointer w-full h-full flex flex-col items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-neutral mb-2">
+                  <label htmlFor="file-upload" className="cursor-pointer w-full h-full flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-12 h-12 text-neutral mb-3">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                     </svg>
+                    <p className="text-sm font-mono text-center text-secondary mb-2">
+                      Drop any file here
+                    </p>
                     <p className="text-xs font-mono text-center text-neutral">
-                      Drop dream recording or text<br />
-                      (mp3, txt, md, pdf)
+                      Code, text, audio, images, data files<br />
+                      AI will auto-detect and analyze
                     </p>
                     <input
-                      id="dream-file-upload"
+                      id="file-upload"
                       type="file"
-                      accept=".mp3,.txt,.md,.pdf"
+                      accept="*/*"
                       className="hidden"
-                      onChange={(e) => handleFileUpload(e, 'dream')}
+                      onChange={handleFileUpload}
+                      data-testid="input-file-upload"
                     />
                   </label>
                 )}
               </div>
               
-              <div className="flex justify-end">
-                <button
-                  onClick={() => selectKernelType('dream')}
-                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors button-rainbow"
-                >
-                  {fileUploading ? 'PROCESSING...' : 'UPLOAD KERNEL'}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-        
-        {/* Code Fragment Kernel */}
-        <div className="bg-dark border border-fog rounded-lg p-5 relative group hover:border-secondary transition-colors duration-300">
-          <div className="absolute top-0 left-0 w-16 h-16 opacity-50 pointer-events-none">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="w-full h-full text-secondary opacity-10">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 9.75L16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
-            </svg>
-          </div>
-          
-          <div className="flex justify-between items-start mb-4">
-            <h3 className="font-cinzel text-secondary rainbow-glow">CODE FRAGMENT</h3>
-            <span className="text-xs font-mono text-neutral neon-glow">Type B</span>
-          </div>
-          
-          <p className="font-mono text-sm text-neutral mb-4">
-            Upload algorithms, functions, or novel computational approaches to form the logical processing of Flaukowski.
-          </p>
-          
-          {selectedKernelType === 'code' ? (
-            <div className="mb-4 space-y-4">
-              <div>
-                <label htmlFor="code-title" className="block text-xs font-mono text-neutral mb-1">
-                  Title your code fragment
-                </label>
-                <input
-                  id="code-title"
-                  type="text"
-                  className="w-full bg-dark border border-fog p-2 rounded focus:border-secondary focus:outline-none font-mono text-sm"
-                  placeholder="Enter a title..."
-                  {...form.register('title')}
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="code-content" className="block text-xs font-mono text-neutral mb-1">
-                  Your code
-                </label>
-                <textarea
-                  id="code-content"
-                  className="w-full bg-dark border border-fog resize-none p-2 rounded focus:border-secondary focus:outline-none font-mono text-sm h-24"
-                  placeholder="Paste your code fragment here..."
-                  {...form.register('content')}
-                ></textarea>
-              </div>
-              
-              <div className="flex justify-between">
-                <button
-                  type="button"
-                  onClick={() => setSelectedKernelType(null)}
-                  className="px-3 py-1 text-xs font-mono text-neutral border border-fog rounded hover:border-fog-accent transition-colors neon-glow"
-                >
-                  CANCEL
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => handleKernelUpload('code')}
-                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors button-rainbow"
-                >
-                  UPLOAD KERNEL
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="border border-dashed border-fog rounded-lg p-6 flex flex-col items-center justify-center mb-4 group-hover:border-secondary/50 transition-colors">
-                {fileUploading && uploadedFiles['code'] && !uploadedFiles['code'].processed ? (
-                  <div className="w-full flex flex-col items-center">
-                    <div className="text-xs font-mono text-secondary mb-2">Processing {uploadedFiles['code'].name}...</div>
-                    <div className="w-full h-1 bg-fog/20 rounded overflow-hidden">
-                      <div className="h-full bg-secondary animate-pulse" style={{width: '100%'}}></div>
-                    </div>
-                    <div className="text-xs font-mono text-neutral mt-2">Parsing algorithmic structures into synaptic connections</div>
-                  </div>
-                ) : (
-                  <label htmlFor="code-file-upload" className="cursor-pointer w-full h-full flex flex-col items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-neutral mb-2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                    </svg>
-                    <p className="text-xs font-mono text-center text-neutral">
-                      Drop code or algorithm<br />
-                      (py, js, rs, c, etc.)
-                    </p>
-                    <input
-                      id="code-file-upload"
-                      type="file"
-                      accept=".py,.js,.rs,.c,.cpp,.ts,.go"
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, 'code')}
-                    />
-                  </label>
-                )}
-              </div>
-              
-              <div className="flex justify-end">
-                <button
-                  onClick={() => selectKernelType('code')}
-                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors button-rainbow"
-                >
-                  {fileUploading ? 'PROCESSING...' : 'UPLOAD KERNEL'}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-        
-        {/* Audio Kernel */}
-        <div className="bg-dark border border-fog rounded-lg p-5 relative group hover:border-secondary transition-colors duration-300">
-          <div className="absolute top-0 left-0 w-16 h-16 opacity-50 pointer-events-none">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="w-full h-full text-secondary opacity-10">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
-            </svg>
-          </div>
-          
-          <div className="flex justify-between items-start mb-4">
-            <h3 className="font-cinzel text-secondary rainbow-glow">AUDIO KERNEL</h3>
-            <span className="text-xs font-mono text-neutral neon-glow">Type C</span>
-          </div>
-          
-          <p className="font-mono text-sm text-neutral mb-4">
-            Upload sounds, rhythms, whispers, or tones that may form the resonant frequencies of Flaukowski's communication.
-          </p>
-          
-          {selectedKernelType === 'audio' ? (
-            <div className="mb-4 space-y-4">
-              <div>
-                <label htmlFor="audio-title" className="block text-xs font-mono text-neutral mb-1">
-                  Title your audio kernel
-                </label>
-                <input
-                  id="audio-title"
-                  type="text"
-                  className="w-full bg-dark border border-fog p-2 rounded focus:border-secondary focus:outline-none font-mono text-sm"
-                  placeholder="Enter a title..."
-                  {...form.register('title')}
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="audio-description" className="block text-xs font-mono text-neutral mb-1">
-                  Describe your audio
-                </label>
-                <textarea
-                  id="audio-description"
-                  className="w-full bg-dark border border-fog resize-none p-2 rounded focus:border-secondary focus:outline-none font-mono text-sm h-24"
-                  placeholder="Describe your audio fragment..."
-                  {...form.register('content')}
-                ></textarea>
-              </div>
-              
-              <div className="flex justify-between">
-                <button
-                  type="button"
-                  onClick={() => setSelectedKernelType(null)}
-                  className="px-3 py-1 text-xs font-mono text-neutral border border-fog rounded hover:border-fog-accent transition-colors neon-glow"
-                >
-                  CANCEL
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => handleKernelUpload('audio')}
-                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors button-rainbow"
-                >
-                  UPLOAD KERNEL
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="border border-dashed border-fog rounded-lg p-6 flex flex-col items-center justify-center mb-4 group-hover:border-secondary/50 transition-colors">
-                {fileUploading && uploadedFiles['audio'] && !uploadedFiles['audio'].processed ? (
-                  <div className="w-full flex flex-col items-center">
-                    <div className="text-xs font-mono text-secondary mb-2">Processing {uploadedFiles['audio'].name}...</div>
-                    <div className="w-full h-1 bg-fog/20 rounded overflow-hidden">
-                      <div className="h-full bg-secondary animate-pulse" style={{width: '100%'}}></div>
-                    </div>
-                    <div className="text-xs font-mono text-neutral mt-2">Distilling sonic frequencies into resonant harmonics</div>
-                  </div>
-                ) : (
-                  <label htmlFor="audio-file-upload" className="cursor-pointer w-full h-full flex flex-col items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-neutral mb-2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                    </svg>
-                    <p className="text-xs font-mono text-center text-neutral">
-                      Drop audio fragment<br />
-                      (mp3, wav, ogg)
-                    </p>
-                    <input
-                      id="audio-file-upload"
-                      type="file"
-                      accept=".mp3,.wav,.ogg"
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, 'audio')}
-                    />
-                  </label>
-                )}
-              </div>
-              
-              <div className="flex justify-end">
-                <button
-                  onClick={() => selectKernelType('audio')}
-                  className="px-3 py-1 text-xs font-mono text-secondary border border-secondary rounded hover:bg-secondary/10 transition-colors button-rainbow"
-                >
-                  {fileUploading ? 'PROCESSING...' : 'UPLOAD KERNEL'}
-                </button>
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="p-2 bg-dark/50 rounded border border-fog/30">
+                  <div className="text-xs font-mono text-secondary">Code</div>
+                  <div className="text-xs font-mono text-neutral">.py .js .ts</div>
+                </div>
+                <div className="p-2 bg-dark/50 rounded border border-fog/30">
+                  <div className="text-xs font-mono text-secondary">Text</div>
+                  <div className="text-xs font-mono text-neutral">.txt .md</div>
+                </div>
+                <div className="p-2 bg-dark/50 rounded border border-fog/30">
+                  <div className="text-xs font-mono text-secondary">Audio</div>
+                  <div className="text-xs font-mono text-neutral">.mp3 .wav</div>
+                </div>
+                <div className="p-2 bg-dark/50 rounded border border-fog/30">
+                  <div className="text-xs font-mono text-secondary">Data</div>
+                  <div className="text-xs font-mono text-neutral">.json .csv</div>
+                </div>
               </div>
             </div>
           )}

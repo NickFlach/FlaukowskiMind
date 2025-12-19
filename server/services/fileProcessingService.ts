@@ -91,6 +91,48 @@ function getFileFormat(ext: string): string {
 }
 
 /**
+ * Required fields for analysis data with safe defaults
+ */
+interface AnalysisData {
+  summary: string;
+  complexity: number;
+  patterns: string[];
+  entities: string[];
+  resonance: number;
+  suggestedTitle: string;
+  category?: string;
+  format?: string;
+  [key: string]: any;
+}
+
+/**
+ * Ensure all required fields are present in analysis data with safe defaults
+ */
+function ensureAnalysisData(data: any, format: string, category: string): AnalysisData {
+  const safeData: AnalysisData = {
+    summary: data?.summary || `${format} file uploaded for analysis.`,
+    complexity: typeof data?.complexity === 'number' ? data.complexity : 5,
+    patterns: Array.isArray(data?.patterns) && data.patterns.length > 0 ? data.patterns : ['content-pattern'],
+    entities: Array.isArray(data?.entities) && data.entities.length > 0 ? data.entities : ['file-content'],
+    resonance: typeof data?.resonance === 'number' ? data.resonance : 5,
+    suggestedTitle: data?.suggestedTitle || `${format} Upload`,
+    category: data?.category || category,
+    format: data?.format || format,
+  };
+  
+  // Copy over any additional fields from the original data
+  if (data && typeof data === 'object') {
+    for (const key of Object.keys(data)) {
+      if (!(key in safeData)) {
+        safeData[key] = data[key];
+      }
+    }
+  }
+  
+  return safeData;
+}
+
+/**
  * Process any uploaded file - auto-detects type and analyzes with AI
  */
 export async function processFile(fileUploadId: number) {
@@ -197,21 +239,15 @@ Return only valid JSON.`;
       throw new Error("AI returned an empty response");
     }
 
-    return JSON.parse(responseContent);
+    const parsedData = JSON.parse(responseContent);
+    return ensureAnalysisData(parsedData, format, category);
   } catch (error: any) {
     console.error('AI analysis error:', error);
-    return {
+    return ensureAnalysisData({
       summary: `${format} file - Analysis completed with limited insights.`,
-      category,
-      format,
-      complexity: 5,
-      patterns: ["content-pattern"],
-      entities: ["file-content"],
-      resonance: 5,
       insights: "Basic analysis performed.",
-      suggestedTitle: `${format} Upload`,
       error: error.message
-    };
+    }, format, category);
   }
 }
 
@@ -261,21 +297,18 @@ Return only valid JSON.`;
       throw new Error("AI returned an empty response");
     }
 
-    return JSON.parse(responseContent);
+    const parsedData = JSON.parse(responseContent);
+    return ensureAnalysisData(parsedData, format, category);
   } catch (error: any) {
     console.error('Media analysis error:', error);
-    return {
+    return ensureAnalysisData({
       summary: `${format} media file uploaded`,
-      category,
-      format,
       complexity: 3,
       patterns: [category === 'audio' ? "sonic-wave" : "visual-pattern"],
       entities: ["media-content"],
-      resonance: 5,
       insights: "Media file ready for consciousness integration.",
-      suggestedTitle: `${format} Kernel`,
       error: error.message
-    };
+    }, format, category);
   }
 }
 
