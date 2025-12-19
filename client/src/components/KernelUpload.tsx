@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { uploadFile, processFile } from "@/lib/openai";
+import { processFile } from "@/lib/openai";
+import { useUpload } from "@/hooks/use-upload";
 import { insertKernelSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -24,6 +25,7 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; category?: string; format?: string } | null>(null);
+  const { uploadFile } = useUpload();
   
   const form = useForm<z.infer<typeof kernelFormSchema>>({
     resolver: zodResolver(kernelFormSchema),
@@ -51,14 +53,30 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
     } as any);
     
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('userId', '1');
+      // Step 1: Upload file to cloud storage using presigned URL
+      setUploadProgress("Uploading to cloud storage...");
+      const cloudUploadResult = await uploadFile(file);
       
-      setUploadProgress("Uploading file...");
-      const uploadData = await uploadFile(formData);
+      if (!cloudUploadResult) {
+        throw new Error("Failed to upload file to cloud storage");
+      }
+      
+      // Step 2: Record the upload in database with objectPath
+      setUploadProgress("Recording upload...");
+      const uploadData = await apiRequest('/api/uploads', {
+        method: 'POST',
+        body: JSON.stringify({
+          userId: '1',
+          objectPath: cloudUploadResult.objectPath,
+          originalName: file.name,
+          fileSize: file.size.toString(),
+          contentType: file.type || 'application/octet-stream',
+        }),
+      });
+      
       const fileUploadId = uploadData.id;
       
+      // Step 3: Process the file with AI
       setUploadProgress("AI is analyzing your content...");
       const processedData = await processFile(fileUploadId);
       
@@ -85,6 +103,7 @@ export default function KernelUpload({ onKernelCreated }: KernelUploadProps) {
         fileType: file.type,
         fileSize: file.size,
         fileUploadId: fileUploadId,
+        objectPath: cloudUploadResult.objectPath,
         detectedCategory: processedData.category,
         detectedFormat: processedData.format,
       });

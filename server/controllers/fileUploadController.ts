@@ -11,14 +11,33 @@ import * as fileProcessingService from '../services/fileProcessingService';
 // Process a file upload request
 export const handleFileUpload = async (req: Request, res: Response) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    const { userId } = req.body;
+    const { userId, objectPath, originalName, fileSize, contentType } = req.body;
     
     if (!userId) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Handle cloud storage uploads (no file via multer, but objectPath provided)
+    if (!req.file && objectPath) {
+      const ext = path.extname(originalName || '').toLowerCase();
+      const detectedType = detectFileType(ext);
+      
+      const fileUpload = await storage.createFileUpload({
+        userId: parseInt(userId, 10),
+        fileName: objectPath.split('/').pop() || 'cloud-file',
+        originalName: originalName || 'uploaded-file',
+        fileSize: parseInt(fileSize, 10) || 0,
+        fileType: detectedType,
+        filePath: objectPath,
+        status: 'uploaded',
+      });
+      
+      return res.status(201).json(fileUpload);
+    }
+    
+    // Handle traditional multer file uploads
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
     }
     
     // Auto-detect file type from extension

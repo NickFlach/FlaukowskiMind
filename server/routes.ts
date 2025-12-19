@@ -20,9 +20,12 @@ import * as neuralNetworkController from "./controllers/neuralNetworkController"
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
+  
+  registerObjectStorageRoutes(app);
   
   // Set up WebSocket server
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
