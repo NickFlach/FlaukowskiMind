@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { storage } from '../storage';
 import { insertFileUploadSchema } from '@shared/schema';
 import path from 'path';
-import * as codeProcessingService from '../services/codeProcessingService';
+import * as fileProcessingService from '../services/fileProcessingService';
 
 /**
  * Controller for handling file uploads
@@ -15,18 +15,22 @@ export const handleFileUpload = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const { userId, fileType } = req.body;
+    const { userId } = req.body;
     
-    if (!userId || !fileType) {
+    if (!userId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
+    
+    // Auto-detect file type from extension
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    const detectedType = detectFileType(ext);
     
     const fileUpload = await storage.createFileUpload({
       userId: parseInt(userId, 10),
       fileName: req.file.filename,
       originalName: req.file.originalname,
       fileSize: req.file.size,
-      fileType: fileType,
+      fileType: detectedType,
       filePath: req.file.path,
       status: 'uploaded',
     });
@@ -37,6 +41,18 @@ export const handleFileUpload = async (req: Request, res: Response) => {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to upload file' });
   }
 };
+
+// Auto-detect file type from extension
+function detectFileType(ext: string): string {
+  const codeExts = ['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.c', '.cpp', '.cs', '.go', '.rb', '.php', '.rs', '.swift', '.kt', '.scala', '.hs', '.lua', '.r', '.sh', '.pl', '.ex', '.sql'];
+  const audioExts = ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a'];
+  const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+  
+  if (codeExts.includes(ext)) return 'code';
+  if (audioExts.includes(ext)) return 'audio';
+  if (imageExts.includes(ext)) return 'image';
+  return 'document';
+}
 
 // Link a file upload to a kernel
 export const linkFileToKernel = async (req: Request, res: Response) => {
@@ -125,8 +141,8 @@ export const getFileUpload = async (req: Request, res: Response) => {
   }
 };
 
-// Process a code file with OpenAI
-export const processCodeFile = async (req: Request, res: Response) => {
+// Process any file with AI - unified endpoint
+export const processFile = async (req: Request, res: Response) => {
   try {
     const fileUploadId = parseInt(req.params.id, 10);
     
@@ -140,16 +156,16 @@ export const processCodeFile = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'File upload not found' });
     }
     
-    // Only process files that are code-related
-    if (fileUpload.fileType !== 'code') {
-      return res.status(400).json({ error: 'Only code files can be processed with this endpoint' });
-    }
-    
-    const result = await codeProcessingService.processCodeFile(fileUploadId);
+    const result = await fileProcessingService.processFile(fileUploadId);
     
     res.status(200).json(result);
   } catch (error) {
-    console.error('Process code file error:', error);
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to process code file' });
+    console.error('Process file error:', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to process file' });
   }
+};
+
+// Legacy endpoint - redirects to unified processing
+export const processCodeFile = async (req: Request, res: Response) => {
+  return processFile(req, res);
 };

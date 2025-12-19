@@ -522,8 +522,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Handle file uploads
   app.post('/api/uploads', upload.single('file'), fileUploadController.handleFileUpload);
   
-  // Process uploaded code files
+  // Process uploaded code files (legacy endpoint)
   app.post('/api/uploads/code/:fileUploadId/process', fileUploadController.processCodeFile);
+  
+  // Unified file processing endpoint - auto-detects file type and processes with AI
+  app.post('/api/uploads/:id/process', fileUploadController.processFile);
   
   // Get a specific file upload
   app.get('/api/uploads/:fileUploadId', fileUploadController.getFileUpload);

@@ -249,3 +249,5 @@ export const kernelsRelations = relations(kernels, ({ one, many }) => ({
   }),
   fileUploads: many(fileUploads),
 }));
+
+export * from "./models/chat";
