@@ -46,32 +46,28 @@ export function registerObjectStorageRoutes(app: Express): void {
         });
       }
 
-      // Check if sidecar is available (production environment check)
-      const sidecarAvailable = await isSidecarAvailable();
-      if (!sidecarAvailable) {
-        console.log("[Object Storage] Sidecar unavailable - likely production environment");
-        return res.status(503).json({
-          error: "File uploads are currently only available in the development environment. This feature will be enabled in production soon.",
-        });
-      }
-
       console.log("[Object Storage] Generating presigned URL...");
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
       console.log("[Object Storage] Got presigned URL");
 
-      // Extract object path from the presigned URL for later reference
       const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
       console.log("[Object Storage] Object path:", objectPath);
 
       res.json({
         uploadURL,
         objectPath,
-        // Echo back the metadata for client convenience
         metadata: { name, size, contentType },
       });
     } catch (error) {
       console.error("[Object Storage] Error generating upload URL:", error);
       const message = error instanceof Error ? error.message : "Failed to generate upload URL";
+      
+      if (message.includes("make sure you're running on Replit")) {
+        return res.status(503).json({ 
+          error: "File uploads are temporarily unavailable. Please try again later." 
+        });
+      }
+      
       res.status(500).json({ error: message });
     }
   });
