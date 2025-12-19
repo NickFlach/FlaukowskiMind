@@ -38,6 +38,7 @@ export function registerObjectStorageRoutes(app: Express): void {
   app.post("/api/uploads/request-url", async (req, res) => {
     try {
       const { name, size, contentType } = req.body;
+      console.log("[Object Storage] Request URL called with:", { name, size, contentType });
 
       if (!name) {
         return res.status(400).json({
@@ -45,10 +46,22 @@ export function registerObjectStorageRoutes(app: Express): void {
         });
       }
 
+      // Check if sidecar is available (production environment check)
+      const sidecarAvailable = await isSidecarAvailable();
+      if (!sidecarAvailable) {
+        console.log("[Object Storage] Sidecar unavailable - likely production environment");
+        return res.status(503).json({
+          error: "File uploads are currently only available in the development environment. This feature will be enabled in production soon.",
+        });
+      }
+
+      console.log("[Object Storage] Generating presigned URL...");
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      console.log("[Object Storage] Got presigned URL");
 
       // Extract object path from the presigned URL for later reference
       const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      console.log("[Object Storage] Object path:", objectPath);
 
       res.json({
         uploadURL,
@@ -57,8 +70,9 @@ export function registerObjectStorageRoutes(app: Express): void {
         metadata: { name, size, contentType },
       });
     } catch (error) {
-      console.error("Error generating upload URL:", error);
-      res.status(500).json({ error: "Failed to generate upload URL" });
+      console.error("[Object Storage] Error generating upload URL:", error);
+      const message = error instanceof Error ? error.message : "Failed to generate upload URL";
+      res.status(500).json({ error: message });
     }
   });
 

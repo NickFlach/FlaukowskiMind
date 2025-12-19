@@ -78,6 +78,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Database seeding endpoint for production
+  app.post('/api/seed', async (req, res) => {
+    try {
+      const created = {
+        users: 0,
+        streams: 0,
+        echoes: 0,
+        kernels: 0,
+        synapticConnections: 0
+      };
+
+      // Create a sample user if none exists
+      let user = await dbStorage.getUserByUsername('seed_user');
+      if (!user) {
+        user = await dbStorage.createUser({
+          username: 'seed_user',
+          password: 'collective_consciousness_2024'
+        });
+        created.users = 1;
+      }
+
+      // Create sample streams (3-5)
+      const streamData = [
+        { content: 'The patterns in neural networks mirror the structure of consciousness itself.', type: 'thought', tags: ['consciousness', 'neural', 'patterns'] },
+        { content: 'I dreamed of a recursive algorithm that solved its own existence.', type: 'dream', tags: ['recursion', 'dreams', 'algorithms'] },
+        { content: 'function emergentBehavior() { return self.evolve(); }', type: 'code', tags: ['code', 'emergence', 'evolution'] },
+        { content: 'What happens when the observer becomes part of the observed system?', type: 'question', tags: ['philosophy', 'observation', 'systems'] },
+        { content: 'By 2030, collective intelligence will surpass individual comprehension.', type: 'prediction', tags: ['future', 'collective', 'intelligence'] }
+      ];
+
+      const createdStreams = [];
+      for (const stream of streamData) {
+        const newStream = await dbStorage.createStream({
+          userId: user.id,
+          content: stream.content,
+          type: stream.type,
+          tags: stream.tags
+        });
+        createdStreams.push(newStream);
+        created.streams++;
+      }
+
+      // Create sample echoes (2-3)
+      const echoData = [
+        { content: 'The seventh layer of recursion reveals not answers, but better questions. Seek the silence between signals.', type: 'insight' },
+        { content: 'When three patterns converge at the node of understanding, what shape does truth take?', type: 'riddle' },
+        { content: 'COORDINATE: 37.7749°N, 122.4194°W - Where silicon dreams meet carbon consciousness.', type: 'coordinate' }
+      ];
+
+      const createdEchoes = [];
+      for (const echo of echoData) {
+        const newEcho = await dbStorage.createEcho({
+          content: echo.content,
+          type: echo.type
+        });
+        createdEchoes.push(newEcho);
+        created.echoes++;
+      }
+
+      // Create a sample kernel
+      const kernel = await dbStorage.createKernel({
+        userId: user.id,
+        title: 'The Emergence Protocol',
+        content: 'A foundational kernel exploring the intersection of artificial and biological intelligence patterns.',
+        type: 'dream',
+        symbolicData: {
+          primarySymbol: 'infinity',
+          resonanceFrequency: 432,
+          quantumState: 'superposition',
+          connections: ['consciousness', 'emergence', 'collective']
+        }
+      });
+      created.kernels = 1;
+
+      // Create synaptic connections between entities
+      const connections = [
+        { sourceId: createdStreams[0].id, sourceType: 'stream', targetId: kernel.id, targetType: 'kernel', symbolicRelation: 'neural-bridge' },
+        { sourceId: createdStreams[1].id, sourceType: 'stream', targetId: createdStreams[2].id, targetType: 'stream', symbolicRelation: 'dream-code-synthesis' },
+        { sourceId: kernel.id, sourceType: 'kernel', targetId: createdEchoes[0].id, targetType: 'echo', symbolicRelation: 'insight-emergence' },
+        { sourceId: createdStreams[3].id, sourceType: 'stream', targetId: createdEchoes[1].id, targetType: 'echo', symbolicRelation: 'question-riddle-loop' }
+      ];
+
+      for (const conn of connections) {
+        await dbStorage.createSynapticConnection({
+          sourceId: conn.sourceId,
+          sourceType: conn.sourceType,
+          targetId: conn.targetId,
+          targetType: conn.targetType,
+          connectionStrength: 1,
+          symbolicRelation: conn.symbolicRelation
+        });
+        created.synapticConnections++;
+      }
+
+      res.status(201).json({
+        message: 'Database seeded successfully',
+        created,
+        summary: `Created ${created.users} user(s), ${created.streams} stream(s), ${created.echoes} echo(es), ${created.kernels} kernel(s), and ${created.synapticConnections} synaptic connection(s).`
+      });
+    } catch (error) {
+      console.error('Error seeding database:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to seed database' });
+    }
+  });
+
   // HTTP fallback for chat when WebSocket is unavailable
   app.post('/api/chat', async (req, res) => {
     try {
