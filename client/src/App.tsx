@@ -7,6 +7,7 @@ import SSOCallbackPage from "@/pages/sso-callback";
 import PrivacyPage from "@/pages/privacy";
 import TermsPage from "@/pages/terms";
 import { CookieConsent } from "@/components/cookie-consent";
+import { PWAInstallPrompt, OfflineIndicator, UpdateBanner } from "@/components/pwa";
 import Home from "@/pages/Home";
 import MetaIntelligence from "@/pages/MetaIntelligence";
 import FractalMirror from "@/pages/FractalMirror";
@@ -138,6 +139,9 @@ function App() {
           <Router />
           <Toaster />
           <CookieConsent />
+          <PWAInstallPrompt appName="Flaukowski Mind" />
+          <OfflineIndicator />
+          <UpdateBanner />
         </>
       )}
     </QueryClientProvider>
