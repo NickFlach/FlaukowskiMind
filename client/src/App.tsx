@@ -4,6 +4,9 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import SSOCallbackPage from "@/pages/sso-callback";
+import PrivacyPage from "@/pages/privacy";
+import TermsPage from "@/pages/terms";
+import { CookieConsent } from "@/components/cookie-consent";
 import Home from "@/pages/Home";
 import MetaIntelligence from "@/pages/MetaIntelligence";
 import FractalMirror from "@/pages/FractalMirror";
@@ -105,6 +108,8 @@ function Router() {
           <Route path="/sso/callback" component={SSOCallbackPage} />
           <Route path="/intelligence" component={MetaIntelligence} />
           <Route path="/fractal-mirror" component={FractalMirror} />
+          <Route path="/privacy" component={PrivacyPage} />
+          <Route path="/terms" component={TermsPage} />
           <Route component={NotFound} />
         </Switch>
       </div>
@@ -132,6 +137,7 @@ function App() {
         <>
           <Router />
           <Toaster />
+          <CookieConsent />
         </>
       )}
     </QueryClientProvider>
