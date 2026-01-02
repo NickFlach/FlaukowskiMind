@@ -3,6 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
+import SSOCallbackPage from "@/pages/sso-callback";
 import Home from "@/pages/Home";
 import MetaIntelligence from "@/pages/MetaIntelligence";
 import FractalMirror from "@/pages/FractalMirror";
@@ -101,6 +102,7 @@ function Router() {
       <div className={`pt-16`}> {/* Add padding for fixed navbar */}
         <Switch>
           <Route path="/" component={Home} />
+          <Route path="/sso/callback" component={SSOCallbackPage} />
           <Route path="/intelligence" component={MetaIntelligence} />
           <Route path="/fractal-mirror" component={FractalMirror} />
           <Route component={NotFound} />
